@@ -793,3 +793,54 @@ tr.clickrow:hover {
         display: none
     }
 }
+.workflow,
+.upload-options,
+.packet-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.workflow {
+    margin-bottom: 15px;
+}
+
+.upload-options {
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.upload-options label {
+    flex: 1 1 175px;
+    min-width: 0;
+    text-align: left;
+}
+
+.upload-options input {
+    display: block;
+    margin-top: 5px;
+    max-width: 100%;
+}
+
+.packet-actions a {
+    text-decoration: none;
+}
+
+@media (max-width: 700px) {
+    .sidebar .mobilemenu {
+        display: flex;
+        gap: 6px;
+    }
+
+    .sidebar .brand {
+        flex-shrink: 0;
+    }
+
+    .field-review {
+        display: block;
+    }
+
+    .docrow {
+        flex-wrap: wrap;
+    }
+}
