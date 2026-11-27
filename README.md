@@ -35,7 +35,7 @@ NEXT_PUBLIC_API_URL= NEXT_TELEMETRY_DISABLED=1 npm run build
 NEXT_TELEMETRY_DISABLED=1 npm run start
 ```
 
-Open [PriorProof on the laptop](http://127.0.0.1:3000) and enter the key printed in terminal 1. Use `npm run dev` in place of the build and start commands when developing locally. For a persistent key or other settings, copy `backend/.env.example` to `backend/.env` if one does not already exist and replace the example key. Shell environment variables take precedence.
+Open [PriorProof on the laptop](http://127.0.0.1:3000) and select **Prepare a Cashless Request** to sign in with the key printed in terminal 1. Use `npm run dev` in place of the build and start commands when developing locally. For a persistent key or other settings, copy `backend/.env.example` to `backend/.env` if one does not already exist and replace the example key. Shell environment variables take precedence.
 
 The demo uses one shared account. FastAPI checks the signed bearer session and case ownership before serving case data, source files, or packets. Sessions expire after 12 hours or at a backend restart. Use one API worker for the demo session and background processing state. SQLite and original documents are stored locally on disk.
 
@@ -80,7 +80,50 @@ AI_PROVIDER=ollama OLLAMA_BASE_URL=http://127.0.0.1:11434 OLLAMA_MODEL=qwen3:4b 
   .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Ollama must be on the same machine. It receives up to 7,000 characters of local text per page. The adapter checks the structured result against allowed fields and source quotes. Unsupported suggestions are discarded. A failed request, malformed response, or response containing only unsupported suggestions keeps the previous results and marks processing failed. Demo rules can run independently with no model and only extract the explicit patterns they recognize.
+Ollama must be on the same machine. For slower CPU-only runs, the per-request read timeout can be configured with `OLLAMA_TIMEOUT_SECONDS` (60 seconds by default, up to 180). The adapter considers the first 7,000 characters per page and sends only eligible labelled lines in a separate untrusted-data message. Pages without eligible lines skip the model request. The backend assigns each field group and checks structured proposals against the original source page. Unsupported suggestions are discarded. A failed request, malformed response, or response containing only unsupported suggestions keeps the previous results and marks processing failed. Demo rules can run independently with no model and only extract the explicit patterns they recognize.
+
+## Three-minute guided demo
+
+Use `AI_PROVIDER=mock` for a fast live demonstration beside the prepared extraction. Use only the fictional records.
+
+1. Open **Explore Patient Journey** on the landing page. The steps show Aarav’s admission, the record gaps and what a reviewer checks. Select **Start Guided Demo** and sign in. This opens a separate prepared copy of the original fictional case. Existing demo decisions are reused if you return.
+2. Open **Evidence graph**. Select **Admission date** under open issues and inspect its connected facts. Open the source evidence for each date. The graph also shows the missing insurance identification.
+3. Follow **Smart next action** to Documents. Select **Upload fictional membership card** and **Process documents**. The membership card fixes the checklist gap. The live run preserves the prepared reviews.
+4. In Review Evidence, compare 26 November in the admission note with 27 November in the treatment plan. Verify the admission note’s value and reject the conflicting value. The preparedness score updates to 100 on the default deterministic guided run. Select **Mark ready for submission**.
+5. Continue to **Generate Packet**, generate the PDF, then download or open it. The workspace can also create a local simulated submission reference.
+6. Open **Evaluation** for the measured runs and **Trust Centre** for the running controls and case activity. To reset just the prepared copy, delete the case with ID `DEMO-GUIDED-1024` in Trust Centre, then open **Start Guided Demo** again.
+
+## Evidence, readiness and action rules
+
+The Evidence Graph uses the authenticated case response. Solid lines show records or supported values. Dashed relationships show category matches, missing checklist support or competing values. The document labels come from upload categories. Reviewers can inspect source pages and excerpts from the graph or the review screen.
+
+The [readiness rules](backend/app/readiness_rules.json) define the weights and required, essential and critical lists. Documents are scored against the number of required categories. Each remaining dimension uses the number of configured essential fields: present (including staff-entered case values), supported by a valid source quote, verified by staff, and present without an open conflict. An empty denominator earns zero points. Essential blockers gate readiness independently of the score. A staff override leaves the blockers visible and records an activity event. OCR and extraction actions, missing fields, unsupported proposals, conflicts and review actions link to the affected document or field.
+
+Accepted machine values require an explicit label, a matching full value and an exact quote on the source page. Staff-edited values are labelled separately from machine evidence. This narrow validation can miss unstructured prose. It cannot establish the authenticity of a source document or recognize every deceptive instruction. The model receives no tools, credentials or submission capability.
+
+## Reproduce the benchmark
+
+```bash
+cd /home/mridul/Desktop/priorproof
+backend/.venv/bin/python evaluation/generate.py
+backend/.venv/bin/python evaluation/run.py --provider mock
+OLLAMA_BASE_URL=http://127.0.0.1:11434 backend/.venv/bin/python evaluation/run.py --provider ollama --model qwen3:4b
+```
+
+The default benchmark evaluates all ten cases through the application API using temporary SQLite and upload storage. Add `--case injection` (repeat `--case` for more fixture IDs) for a short run. The published JSON labels selected-case results. The dashboard loads the files in `public/evaluation/`. The downloadable archive groups originals under `documents/` and human-authored expectations under `expected/`. Actual fields and measurements are in provider-specific result JSON outside that archive. Use synthetic input exclusively.
+
+- End-to-end latency measures upload, OCR, processing and detail retrieval per case. Model request latency measures Ollama adapter wall time for calls actually made, including any cold load or timeout.
+- Field precision and recall compare unique canonical name/value pairs per case. F1 is their harmonic mean. Date normalization maps ISO and explicit month-name dates to ISO. Money formatting normalizes separators, supported currency symbols and decimal precision without conflating currencies. Names and ordinary text are case-folded with whitespace normalized.
+- Citation correctness requires the expected document, page, fact and labelled quote, plus a quote found in the returned source page. Unsupported rate counts accepted rows with no such ground-truth citation. Separately reported excluded slots are unique document/page/field labels rejected by the validator.
+- Missing and conflict detection compare sets of missing categories and unresolved field names per case. Classifications use micro-averaged counts. Undefined ratios are shown as a dash.
+- OCR execution failures and pages with no readable text are counted separately. One scanned fixture deliberately has a blank page.
+- The two providers and any selected-case runs have separate results. Label-aligned synthetic fixtures favor deterministic rules. Neither an outcome improvement nor real-world generalization has been measured.
+
+To add a manual-versus-assisted comparison, place `workflow-timing.json` under `public/evaluation/` with a string `protocol` and arrays `manualSeconds` and `assistedSeconds` populated from recorded trials.
+
+## Trust, activity and deletion
+
+The Trust Centre reads the active backend configuration after authentication. Case activity stores pseudonymous actor/session IDs, object IDs, timestamps and outcomes. It excludes source text, extracted values and override reasons. Confirmed deletion removes the selected case data, upload artifacts and legacy packets managed by this application. Failed file cleanup is retried on startup or repeat deletion. The manual retention setting and limitations are described in the [draft policies](compliance/retention-policy.md).
 
 ## Run the checks
 

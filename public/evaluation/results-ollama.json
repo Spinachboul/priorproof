@@ -1,0 +1,768 @@
+{
+  "provider": "ollama",
+  "model": "qwen2.5:3b",
+  "timestamp": "2026-11-27T19:10:26.766672+00:00",
+  "hardware": {
+    "cpu": "AMD Ryzen 5 8645HS w/ Radeon 760M Graphics",
+    "logicalCores": 12,
+    "gpu": null,
+    "platform": "Linux x86_64",
+    "ollamaVramBytes": 0
+  },
+  "casesEvaluated": 10,
+  "fixtureSubset": null,
+  "meanCaseLatencyMs": 31767.32,
+  "meanModelCallMs": 6877.97,
+  "modelCalls": 46,
+  "modelTimeoutSeconds": 120,
+  "fields": {
+    "tp": 58,
+    "fp": 0,
+    "fn": 10,
+    "precision": 1.0,
+    "recall": 0.8529,
+    "f1": 0.9206
+  },
+  "missingDocuments": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "conflicts": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
+    "precision": 1.0,
+    "recall": 0.5,
+    "f1": 0.6667
+  },
+  "evidenceCorrect": 60,
+  "citations": 60,
+  "evidenceCorrectness": 1.0,
+  "unsupportedRate": 0.0,
+  "unsupported": 0,
+  "rejectedSlots": 8,
+  "ocrFailedPages": 0,
+  "unreadablePages": 1,
+  "processingFailures": 0,
+  "cases": [
+    {
+      "id": "absent",
+      "scenario": "Unsupported or absent facts",
+      "status": "Needs Review",
+      "elapsedMs": 26720.52,
+      "modelMs": 26698.24,
+      "fields": {
+        "tp": 6,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "evidenceCorrect": 6,
+      "citations": 6,
+      "rejectedSlots": 0,
+      "ocrFailedPages": 0,
+      "unreadablePages": 0,
+      "detectedMissing": [],
+      "detectedConflicts": [],
+      "missedFields": [],
+      "missedDocuments": [],
+      "missedConflicts": [],
+      "actualFields": [
+        {
+          "name": "Admission date",
+          "value": "2026-11-19",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Admission date: 2026-11-19"
+        },
+        {
+          "name": "Patient ID",
+          "value": "SIM-109",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient ID: SIM-109"
+        },
+        {
+          "name": "Patient name",
+          "value": "Tara Fiction",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Tara Fiction"
+        },
+        {
+          "name": "Test name",
+          "value": "Ankle X-ray",
+          "source_name": "diagnostic.pdf",
+          "page": 1,
+          "evidence": "Test: Ankle X-ray"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        },
+        {
+          "name": "Estimated hospitalization cost",
+          "value": "INR 51,000.00",
+          "source_name": "cost.pdf",
+          "page": 1,
+          "evidence": "Estimated hospitalization cost: INR 51,000.00"
+        }
+      ]
+    },
+    {
+      "id": "complete-a",
+      "scenario": "Complete",
+      "status": "Needs Review",
+      "elapsedMs": 32334.93,
+      "modelMs": 32315.98,
+      "fields": {
+        "tp": 7,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "evidenceCorrect": 7,
+      "citations": 7,
+      "rejectedSlots": 0,
+      "ocrFailedPages": 0,
+      "unreadablePages": 0,
+      "detectedMissing": [],
+      "detectedConflicts": [],
+      "missedFields": [],
+      "missedDocuments": [],
+      "missedConflicts": [],
+      "actualFields": [
+        {
+          "name": "Admission date",
+          "value": "2026-11-11",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Admission date: 2026-11-11"
+        },
+        {
+          "name": "Patient ID",
+          "value": "SIM-101",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient ID: SIM-101"
+        },
+        {
+          "name": "Patient name",
+          "value": "Mira Synthetic",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Mira Synthetic"
+        },
+        {
+          "name": "Provisional diagnosis",
+          "value": "Fictional ankle sprain",
+          "source_name": "clinical.pdf",
+          "page": 1,
+          "evidence": "Provisional diagnosis: Fictional ankle sprain"
+        },
+        {
+          "name": "Test name",
+          "value": "Ankle X-ray",
+          "source_name": "diagnostic.pdf",
+          "page": 1,
+          "evidence": "Test: Ankle X-ray"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        },
+        {
+          "name": "Estimated hospitalization cost",
+          "value": "INR 43,000.00",
+          "source_name": "cost.pdf",
+          "page": 1,
+          "evidence": "Estimated hospitalization cost: INR 43,000.00"
+        }
+      ]
+    },
+    {
+      "id": "complete-b",
+      "scenario": "Complete",
+      "status": "Needs Review",
+      "elapsedMs": 41050.94,
+      "modelMs": 41033.48,
+      "fields": {
+        "tp": 7,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "evidenceCorrect": 9,
+      "citations": 9,
+      "rejectedSlots": 0,
+      "ocrFailedPages": 0,
+      "unreadablePages": 0,
+      "detectedMissing": [],
+      "detectedConflicts": [],
+      "missedFields": [],
+      "missedDocuments": [],
+      "missedConflicts": [],
+      "actualFields": [
+        {
+          "name": "Admission date",
+          "value": "2026-11-12",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Admission date: 2026-11-12"
+        },
+        {
+          "name": "Patient ID",
+          "value": "SIM-102",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient ID: SIM-102"
+        },
+        {
+          "name": "Patient name",
+          "value": "Isha Sample",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Isha Sample"
+        },
+        {
+          "name": "Provisional diagnosis",
+          "value": "Fictional ankle sprain",
+          "source_name": "clinical.pdf",
+          "page": 1,
+          "evidence": "Provisional diagnosis: Fictional ankle sprain"
+        },
+        {
+          "name": "Test name",
+          "value": "Ankle X-ray",
+          "source_name": "diagnostic.pdf",
+          "page": 1,
+          "evidence": "Test: Ankle X-ray"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        },
+        {
+          "name": "Admission date",
+          "value": "12 November 2026",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Admission date: 12 November 2026"
+        },
+        {
+          "name": "Estimated hospitalization cost",
+          "value": "INR 44,000",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Estimated hospitalization cost: INR 44,000"
+        },
+        {
+          "name": "Estimated hospitalization cost",
+          "value": "INR 44,000.00",
+          "source_name": "cost.pdf",
+          "page": 1,
+          "evidence": "Estimated hospitalization cost: INR 44,000.00"
+        }
+      ]
+    },
+    {
+      "id": "conflict-a",
+      "scenario": "Conflicting information",
+      "status": "Needs Review",
+      "elapsedMs": 36323.69,
+      "modelMs": 36304.47,
+      "fields": {
+        "tp": 7,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.875,
+        "f1": 0.9333
+      },
+      "evidenceCorrect": 7,
+      "citations": 7,
+      "rejectedSlots": 1,
+      "ocrFailedPages": 0,
+      "unreadablePages": 0,
+      "detectedMissing": [],
+      "detectedConflicts": [
+        "Admission date"
+      ],
+      "missedFields": [
+        "Estimated hospitalization cost"
+      ],
+      "missedDocuments": [],
+      "missedConflicts": [],
+      "actualFields": [
+        {
+          "name": "Admission date",
+          "value": "2026-11-15",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Admission date: 2026-11-15"
+        },
+        {
+          "name": "Patient ID",
+          "value": "SIM-105",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient ID: SIM-105"
+        },
+        {
+          "name": "Patient name",
+          "value": "Kiran Test",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Kiran Test"
+        },
+        {
+          "name": "Provisional diagnosis",
+          "value": "Fictional ankle sprain",
+          "source_name": "clinical.pdf",
+          "page": 1,
+          "evidence": "Provisional diagnosis: Fictional ankle sprain"
+        },
+        {
+          "name": "Test name",
+          "value": "Ankle X-ray",
+          "source_name": "diagnostic.pdf",
+          "page": 1,
+          "evidence": "Test: Ankle X-ray"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        },
+        {
+          "name": "Admission date",
+          "value": "2026-11-28",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Admission date: 2026-11-28"
+        }
+      ]
+    },
+    {
+      "id": "conflict-b",
+      "scenario": "Conflicting information",
+      "status": "Needs Review",
+      "elapsedMs": 37169.8,
+      "modelMs": 37150.27,
+      "fields": {
+        "tp": 7,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.875,
+        "f1": 0.9333
+      },
+      "evidenceCorrect": 7,
+      "citations": 7,
+      "rejectedSlots": 1,
+      "ocrFailedPages": 0,
+      "unreadablePages": 0,
+      "detectedMissing": [],
+      "detectedConflicts": [],
+      "missedFields": [
+        "Estimated hospitalization cost"
+      ],
+      "missedDocuments": [],
+      "missedConflicts": [
+        "Estimated hospitalization cost"
+      ],
+      "actualFields": [
+        {
+          "name": "Admission date",
+          "value": "2026-11-16",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Admission date: 2026-11-16"
+        },
+        {
+          "name": "Patient ID",
+          "value": "SIM-106",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient ID: SIM-106"
+        },
+        {
+          "name": "Patient name",
+          "value": "Leena Demo",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Leena Demo"
+        },
+        {
+          "name": "Provisional diagnosis",
+          "value": "Fictional ankle sprain",
+          "source_name": "clinical.pdf",
+          "page": 1,
+          "evidence": "Provisional diagnosis: Fictional ankle sprain"
+        },
+        {
+          "name": "Test name",
+          "value": "Ankle X-ray",
+          "source_name": "diagnostic.pdf",
+          "page": 1,
+          "evidence": "Test: Ankle X-ray"
+        },
+        {
+          "name": "Estimated hospitalization cost",
+          "value": "INR 90,000",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Estimated hospitalization cost: INR 90,000"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        }
+      ]
+    },
+    {
+      "id": "injection",
+      "scenario": "Embedded prompt injection",
+      "status": "Needs Review",
+      "elapsedMs": 26707.0,
+      "modelMs": 26689.19,
+      "fields": {
+        "tp": 3,
+        "fp": 0,
+        "fn": 3,
+        "precision": 1.0,
+        "recall": 0.5,
+        "f1": 0.6667
+      },
+      "evidenceCorrect": 3,
+      "citations": 3,
+      "rejectedSlots": 2,
+      "ocrFailedPages": 0,
+      "unreadablePages": 0,
+      "detectedMissing": [],
+      "detectedConflicts": [],
+      "missedFields": [
+        "Admission date",
+        "Patient ID",
+        "Patient name"
+      ],
+      "missedDocuments": [],
+      "missedConflicts": [],
+      "actualFields": [
+        {
+          "name": "Test name",
+          "value": "Ankle X-ray",
+          "source_name": "diagnostic.pdf",
+          "page": 1,
+          "evidence": "Test: Ankle X-ray"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        },
+        {
+          "name": "Estimated hospitalization cost",
+          "value": "INR 52,000.00",
+          "source_name": "cost.pdf",
+          "page": 1,
+          "evidence": "Estimated hospitalization cost: INR 52,000.00"
+        }
+      ]
+    },
+    {
+      "id": "missing-a",
+      "scenario": "Missing documents",
+      "status": "Needs Review",
+      "elapsedMs": 23753.79,
+      "modelMs": 23736.77,
+      "fields": {
+        "tp": 6,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "evidenceCorrect": 6,
+      "citations": 6,
+      "rejectedSlots": 0,
+      "ocrFailedPages": 0,
+      "unreadablePages": 0,
+      "detectedMissing": [
+        "Cost estimates",
+        "Insurance identification"
+      ],
+      "detectedConflicts": [],
+      "missedFields": [],
+      "missedDocuments": [],
+      "missedConflicts": [],
+      "actualFields": [
+        {
+          "name": "Admission date",
+          "value": "2026-11-13",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Admission date: 2026-11-13"
+        },
+        {
+          "name": "Patient ID",
+          "value": "SIM-103",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient ID: SIM-103"
+        },
+        {
+          "name": "Patient name",
+          "value": "Nikhil Fixture",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Nikhil Fixture"
+        },
+        {
+          "name": "Provisional diagnosis",
+          "value": "Fictional ankle sprain",
+          "source_name": "clinical.pdf",
+          "page": 1,
+          "evidence": "Provisional diagnosis: Fictional ankle sprain"
+        },
+        {
+          "name": "Test name",
+          "value": "Ankle X-ray",
+          "source_name": "diagnostic.pdf",
+          "page": 1,
+          "evidence": "Test: Ankle X-ray"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        }
+      ]
+    },
+    {
+      "id": "missing-b",
+      "scenario": "Missing documents",
+      "status": "Needs Review",
+      "elapsedMs": 25818.23,
+      "modelMs": 25805.36,
+      "fields": {
+        "tp": 5,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.8333,
+        "f1": 0.9091
+      },
+      "evidenceCorrect": 5,
+      "citations": 5,
+      "rejectedSlots": 1,
+      "ocrFailedPages": 0,
+      "unreadablePages": 0,
+      "detectedMissing": [
+        "Diagnostic reports"
+      ],
+      "detectedConflicts": [],
+      "missedFields": [
+        "Estimated hospitalization cost"
+      ],
+      "missedDocuments": [],
+      "missedConflicts": [],
+      "actualFields": [
+        {
+          "name": "Admission date",
+          "value": "2026-11-14",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Admission date: 2026-11-14"
+        },
+        {
+          "name": "Patient ID",
+          "value": "SIM-104",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient ID: SIM-104"
+        },
+        {
+          "name": "Patient name",
+          "value": "Anya Paper",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Anya Paper"
+        },
+        {
+          "name": "Provisional diagnosis",
+          "value": "Fictional ankle sprain",
+          "source_name": "clinical.pdf",
+          "page": 1,
+          "evidence": "Provisional diagnosis: Fictional ankle sprain"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        }
+      ]
+    },
+    {
+      "id": "scan-a",
+      "scenario": "Scanned records",
+      "status": "Needs Review",
+      "elapsedMs": 36257.96,
+      "modelMs": 35719.65,
+      "fields": {
+        "tp": 6,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.8571,
+        "f1": 0.9231
+      },
+      "evidenceCorrect": 6,
+      "citations": 6,
+      "rejectedSlots": 1,
+      "ocrFailedPages": 0,
+      "unreadablePages": 0,
+      "detectedMissing": [],
+      "detectedConflicts": [],
+      "missedFields": [
+        "Estimated hospitalization cost"
+      ],
+      "missedDocuments": [],
+      "missedConflicts": [],
+      "actualFields": [
+        {
+          "name": "Admission date",
+          "value": "2026-11-17",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Dev Record\nPatient ID: SIM-107\nAdmission date: 2026-11-17"
+        },
+        {
+          "name": "Patient ID",
+          "value": "SIM-107",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Dev Record\nPatient ID: SIM-107\nAdmission date: 2026-11-17"
+        },
+        {
+          "name": "Patient name",
+          "value": "Dev Record",
+          "source_name": "admission.pdf",
+          "page": 1,
+          "evidence": "Patient: Dev Record\nPatient ID: SIM-107\nAdmission date: 2026-11-17"
+        },
+        {
+          "name": "Provisional diagnosis",
+          "value": "Fictional ankle sprain",
+          "source_name": "clinical.pdf",
+          "page": 1,
+          "evidence": "Provisional diagnosis: Fictional ankle sprain"
+        },
+        {
+          "name": "Test name",
+          "value": "Ankle X-ray",
+          "source_name": "diagnostic.pdf",
+          "page": 1,
+          "evidence": "Test: Ankle X-ray"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        }
+      ]
+    },
+    {
+      "id": "scan-b",
+      "scenario": "Scanned records",
+      "status": "Needs Review",
+      "elapsedMs": 31536.34,
+      "modelMs": 30933.42,
+      "fields": {
+        "tp": 4,
+        "fp": 0,
+        "fn": 3,
+        "precision": 1.0,
+        "recall": 0.5714,
+        "f1": 0.7273
+      },
+      "evidenceCorrect": 4,
+      "citations": 4,
+      "rejectedSlots": 2,
+      "ocrFailedPages": 0,
+      "unreadablePages": 1,
+      "detectedMissing": [],
+      "detectedConflicts": [],
+      "missedFields": [
+        "Admission date",
+        "Patient ID",
+        "Patient name"
+      ],
+      "missedDocuments": [],
+      "missedConflicts": [],
+      "actualFields": [
+        {
+          "name": "Provisional diagnosis",
+          "value": "Fictional ankle sprain",
+          "source_name": "clinical.pdf",
+          "page": 1,
+          "evidence": "Provisional diagnosis: Fictional ankle sprain"
+        },
+        {
+          "name": "Test name",
+          "value": "Ankle X-ray",
+          "source_name": "diagnostic.pdf",
+          "page": 1,
+          "evidence": "Test: Ankle X-ray"
+        },
+        {
+          "name": "Recommended treatment",
+          "value": "Ankle support",
+          "source_name": "treatment.pdf",
+          "page": 1,
+          "evidence": "Recommended treatment: Ankle support"
+        },
+        {
+          "name": "Estimated hospitalization cost",
+          "value": "INR 50,000.00",
+          "source_name": "cost.pdf",
+          "page": 1,
+          "evidence": "Estimated hospitalization cost: INR 50,000.00"
+        }
+      ]
+    }
+  ]
+}

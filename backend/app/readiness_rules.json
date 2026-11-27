@@ -1,0 +1,14 @@
+{
+  "weights": {"documents": 30, "fields": 25, "evidence": 20, "verification": 15, "conflicts": 10},
+  "requiredDocuments": ["Admission notes", "Clinical notes", "Diagnostic reports", "Treatment plans", "Cost estimates", "Insurance identification"],
+  "criticalDocuments": ["Admission notes", "Clinical notes", "Diagnostic reports", "Treatment plans", "Cost estimates", "Insurance identification"],
+  "essentialFields": {
+    "Patient name": "patientName",
+    "Patient ID": "patientId",
+    "Admission date": "admissionDate",
+    "Provisional diagnosis": "diagnosis",
+    "Recommended treatment": "treatment",
+    "Estimated hospitalization cost": "estimatedCost"
+  },
+  "criticalFields": ["Patient name", "Patient ID", "Admission date", "Provisional diagnosis", "Recommended treatment", "Estimated hospitalization cost"]
+}
