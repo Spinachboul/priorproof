@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "PriorProof",
+    "slug": "priorproof",
+    "scheme": "priorproof",
+    "platforms": ["android", "ios"],
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-camera", { "cameraPermission": "Allow PriorProof to capture case documents and scan case QR codes.", "recordAudioAndroid": false }],
+      ["expo-image-picker", { "photosPermission": "Allow PriorProof to select case documents.", "microphonePermission": false }]
+    ],
+    "ios": { "bundleIdentifier": "com.priorproof.mobile", "infoPlist": { "NSLocalNetworkUsageDescription": "Connect to a PriorProof demo server on your local network." } },
+    "android": { "package": "com.priorproof.mobile" }
+  }
+}

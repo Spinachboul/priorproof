@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os, re, json, uuid, sqlite3, logging, mimetypes, hmac, hashlib, secrets, time
+from base64 import b64encode
 import unicodedata
 from collections import deque
 from decimal import Decimal
@@ -14,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Any
 import pymupdf as fitz
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
@@ -145,6 +146,9 @@ def init_db():
   CREATE TABLE IF NOT EXISTS fields(id TEXT PRIMARY KEY,case_id TEXT NOT NULL,group_name TEXT NOT NULL,name TEXT NOT NULL,value TEXT,original TEXT,source_doc TEXT,source_name TEXT,page INTEGER,evidence TEXT,confidence REAL,review TEXT NOT NULL,origin TEXT NOT NULL DEFAULT 'AI-extracted');"""
         )
         c.executescript(audit.SCHEMA)
+        c.execute("""create table if not exists document_uploads(
+            case_id TEXT NOT NULL, upload_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
+            result TEXT NOT NULL, primary key(case_id, upload_id))""")
         c.execute("""create table if not exists unsupported_proposals(
             id TEXT PRIMARY KEY, case_id TEXT NOT NULL, source_doc TEXT NOT NULL,
             page INTEGER NOT NULL, name TEXT NOT NULL, provider TEXT NOT NULL)""")
@@ -258,12 +262,14 @@ class ReviewIn(BaseModel):
         pattern="^(Unreviewed|Verified|Edited|Rejected|Unable to Verify)$"
     )
     reason: Optional[str] = None
+    expectedRevision: str | None = Field(default=None, max_length=64)
 
 
 class ManualFieldIn(BaseModel):
     name: str = Field(max_length=100)
     value: str = Field(max_length=4000)
     group: Optional[str] = None
+    expectedRevision: str | None = Field(default=None, max_length=64)
 
 
 class FieldProposal(BaseModel):
@@ -631,6 +637,7 @@ def prepared_demo():
 @app.on_event("startup")
 def startup():
     init_db()
+    agent.setup()
     ensure_demo()
     drain_file_cleanup()
     with conn() as c:
@@ -737,7 +744,8 @@ def update_case(cid: str, payload: CaseIn):
 
 @app.post("/api/cases/{cid}/documents")
 def upload(
-    cid: str, files: list[UploadFile] = File(...), categories: list[str] = Form(...)
+    cid: str, files: list[UploadFile] = File(...), categories: list[str] = Form(...),
+    upload_id: uuid.UUID | None = Form(None),
 ):
     getcase(cid)
     if len(files) != len(categories) or not 1 <= len(files) <= MAX_FILES:
@@ -746,6 +754,7 @@ def upload(
         raise HTTPException(400, "Select a supported document category")
     staged = []
     paths = []
+    fingerprint = hashlib.sha256()
     try:
         for f, category in zip(files, categories):
             ext = Path(f.filename or "").suffix.lower()
@@ -759,6 +768,7 @@ def upload(
             if not content.startswith(signatures[ext]):
                 raise HTTPException(415, "File contents do not match the selected document type")
             name = Path((f.filename or "document").replace(chr(92), "/")).name[:160]
+            fingerprint.update(json.dumps([name, category, hashlib.sha256(content).hexdigest()]).encode())
             path = UPLOAD / cid / f"{uuid.uuid4()}{ext}"
             path.parent.mkdir(exist_ok=True)
             paths.append(path)
@@ -779,13 +789,31 @@ def upload(
             staged.append((name, category, str(path), text, pages, status))
 
         out = []
-        with conn() as c:
-            mutable_case(cid, c)
-            for name, category, path, text, pages, status in staged:
-                did = add_doc(cid, name, category, path, text, pages, c, status)
-                out.append(dict(id=did, filename=name, category=category, pages=pages, status=status))
-                audit.record(c, "document.uploaded", case_id=cid, object_id=did)
-            invalidate_readiness(c, cid, "Documents Uploaded")
+        cached = None
+        with closing(conn()) as c, c:
+            c.execute("BEGIN IMMEDIATE")
+            case = getcase(cid, c)
+            if upload_id:
+                cached = c.execute("select * from document_uploads where case_id=? and upload_id=?",
+                                   (cid, str(upload_id))).fetchone()
+            if cached:
+                if cached["fingerprint"] != fingerprint.hexdigest():
+                    raise HTTPException(409, "Upload identifier was already used for different files")
+            else:
+                if case["status"] == "Processing":
+                    raise HTTPException(409, "Wait for document processing to finish")
+                for name, category, path, text, pages, status in staged:
+                    did = add_doc(cid, name, category, path, text, pages, c, status)
+                    out.append(dict(id=did, filename=name, category=category, pages=pages, status=status))
+                    audit.record(c, "document.uploaded", case_id=cid, object_id=did)
+                invalidate_readiness(c, cid, "Documents Uploaded")
+                if upload_id:
+                    c.execute("insert into document_uploads values (?,?,?,?)",
+                              (cid, str(upload_id), fingerprint.hexdigest(), json.dumps(out)))
+        if cached:
+            for path in paths:
+                path.unlink(missing_ok=True)
+            return {"documents": json.loads(cached["result"])}
     except Exception:
         for path in paths:
             path.unlink(missing_ok=True)
@@ -972,7 +1000,7 @@ def model_source(text):
     return names, "\n".join(dict.fromkeys(quote for _, _, quote in facts))
 
 
-def ollama_extract(text):
+def ollama_extract(text, remaining=None):
     import requests
 
     names, source = model_source(text)
@@ -980,6 +1008,9 @@ def ollama_extract(text):
         return []
     allowed = ", ".join(names)
     base = ollama_base()
+    timeout = (3, ollama_timeout()) if remaining is None else (
+        min(3, remaining / 3), min(ollama_timeout(), remaining * 2 / 3)
+    )
     with requests.Session() as session:
         session.trust_env = False
         response = session.post(
@@ -1000,7 +1031,7 @@ def ollama_extract(text):
                 "format": ExtractionResult.model_json_schema(),
                 "options": {"temperature": 0, "num_ctx": 4096, "num_predict": 512},
             },
-            timeout=(3, ollama_timeout()),
+            timeout=timeout,
             allow_redirects=False,
         )
     response.raise_for_status()
@@ -1017,7 +1048,7 @@ def field_identity(doc, page, name, original):
     return (doc, page, normalized(name).rstrip(":"), field_value_key(name, original))
 
 
-def process_case(cid: str, provider_override=None):
+def process_case(cid: str, provider_override=None, *, expected_revision=None, remaining=None, committed=None):
     with conn() as c:
         docs = [dict(row) for row in c.execute("select * from documents where case_id=?", (cid,))]
     provider = provider_override or os.getenv("AI_PROVIDER", "mock").lower()
@@ -1026,13 +1057,16 @@ def process_case(cid: str, provider_override=None):
     candidates = {}
     unsupported = set()
     for d in docs:
+        if remaining is not None:
+            remaining()
         if not d["text"].strip():
             continue
         for page, text in document_pages(d["filename"], d["text"]):
+            budget = remaining() if remaining is not None else None
             if provider == "ollama":
                 if not model_source(text)[0]:
                     continue
-                items = ollama_extract(text)
+                items = ollama_extract(text) if budget is None else ollama_extract(text, budget)
             else:
                 items = mock_extract(text)
             for item in items:
@@ -1045,6 +1079,11 @@ def process_case(cid: str, provider_override=None):
     # edits and rejections. Only replace obsolete, untouched machine proposals.
     with conn() as c:
         c.execute("BEGIN IMMEDIATE")
+        if expected_revision is not None:
+            case = getcase(cid, c)
+            if case["updated_at"] != expected_revision or case["status"] == "Processing":
+                raise HTTPException(409, "The case changed during agent processing")
+            remaining()
         c.execute("delete from unsupported_proposals where case_id=?", (cid,))
         c.executemany("insert into unsupported_proposals values(?,?,?,?,?,?)", (
             (str(uuid.uuid4()), cid, doc_id, page, name, provider)
@@ -1077,6 +1116,10 @@ def process_case(cid: str, provider_override=None):
         ).fetchone()
         invalidate_readiness(c, cid, "Needs Review" if active else "Missing Information")
         audit.record(c, "analysis.completed", case_id=cid, object_id=cid, outcome=provider)
+        revision = getcase(cid, c)["updated_at"]
+        if committed is not None:
+            committed(c, revision)
+    return revision
 
 
 def process_case_safely(cid: str):
@@ -1114,7 +1157,9 @@ def extraction(cid: str):
 @app.put("/api/cases/{cid}/review/{fid}")
 def review(cid: str, fid: str, payload: ReviewIn):
     with conn() as c:
-        mutable_case(cid, c)
+        case = mutable_case(cid, c)
+        if payload.expectedRevision is not None and payload.expectedRevision != case["updated_at"]:
+            raise HTTPException(409, "Case changed. Refresh and review the current evidence.")
         r = c.execute(
             "select * from fields where id=? and case_id=?", (fid, cid)
         ).fetchone()
@@ -1145,7 +1190,9 @@ def manual_field(cid: str, body: ManualFieldIn):
     if not canonical or not value or (body.group and body.group != group):
         raise HTTPException(422, "Enter a field name, nonempty value and matching group")
     with conn() as c:
-        mutable_case(cid, c)
+        case = mutable_case(cid, c)
+        if body.expectedRevision is not None and body.expectedRevision != case["updated_at"]:
+            raise HTTPException(409, "Case changed. Refresh before recording the value.")
         fid = add_field(cid, group, canonical, value, review="Verified", origin="Manual entry", connection=c)
         audit.record(c, "field.manually-entered", case_id=cid, object_id=fid)
         invalidate_readiness(c, cid)
@@ -1315,10 +1362,12 @@ def packet(cid: str):
 PACKET_NAME = "PriorProof_PreAuthorization_Draft.pdf"
 
 
-def render_packet(cid):
+def render_packet(cid, revision=None):
     with closing(conn()) as c, c:
         c.execute("BEGIN")
         case = getcase(cid, c)
+        if revision is not None and revision != case["updated_at"]:
+            raise HTTPException(409, "This draft revision is stale")
         if case["status"] == "Processing":
             raise HTTPException(409, "Wait for document processing to finish")
         data = case_snapshot(case, c)
@@ -1473,8 +1522,8 @@ def render_packet(cid):
 
 
 @app.get("/api/cases/{cid}/packet.pdf")
-def get_packet(cid: str):
-    packet_bytes = render_packet(cid)
+def get_packet(cid: str, revision: str | None = Query(default=None, max_length=64)):
+    packet_bytes = render_packet(cid, revision)
     with conn() as c:
         if c.execute("select 1 from cases where id=?", (cid,)).fetchone():
             audit.record(c, "packet.downloaded", case_id=cid, object_id=cid)
@@ -1482,6 +1531,17 @@ def get_packet(cid: str):
         packet_bytes, media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{PACKET_NAME}"'},
     )
+
+
+@app.get("/api/cases/{cid}/packet-preview")
+def packet_preview(cid: str, revision: str = Query(max_length=64), page: int = Query(1, ge=1)):
+    packet_bytes = render_packet(cid, revision)
+    with fitz.open(stream=packet_bytes, filetype="pdf") as document:
+        if page > len(document):
+            raise HTTPException(404, "Draft page not found")
+        image = document[page - 1].get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
+        return {"page": page, "pages": len(document), "width": image.width, "height": image.height,
+                "png": b64encode(image.tobytes("png")).decode("ascii")}
 
 
 @app.post("/api/cases/{cid}/simulate-submission")
@@ -1544,6 +1604,11 @@ def case_activity(cid: str):
 
 @app.delete("/api/cases/{cid}")
 def delete_case(cid: str):
+    with agent.case_lock(cid):
+        return delete_case_data(cid)
+
+
+def delete_case_data(cid: str):
     with conn() as c:
         c.execute("BEGIN IMMEDIATE")
         case = c.execute("select * from cases where id=? and owner_id=?", (cid, DEMO_SUBJECT)).fetchone()
@@ -1567,8 +1632,9 @@ def delete_case(cid: str):
                     artifacts = (path for path in directory.iterdir() if path.is_file() or path.is_symlink())
                     c.executemany("insert or ignore into file_cleanup values(?,?)",
                                   ((cid, str(path)) for path in artifacts))
-            for table in ("unsupported_proposals", "fields", "documents", "audit_events"):
+            for table in ("document_uploads", "unsupported_proposals", "fields", "documents", "audit_events"):
                 c.execute(f"delete from {table} where case_id=?", (cid,))
+            agent.delete_runs(c, cid)
             c.execute("delete from cases where id=?", (cid,))
             audit.record(c, "case.deleted", case_id=cid, object_id=cid)
     pending = drain_file_cleanup(cid)
@@ -1577,3 +1643,8 @@ def delete_case(cid: str):
     except (OSError, ValueError):
         pass
     return {"deleted": True, "cleanupPending": pending}
+
+
+from . import agent
+
+app.include_router(agent.router)

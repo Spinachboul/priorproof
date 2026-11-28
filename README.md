@@ -64,6 +64,84 @@ Open `http://192.168.29.30:3000` on the phone. Both devices need to be on the sa
 
 For different hosts or ports, set `NEXT_PUBLIC_API_URL` before building the frontend and include the exact frontend origin in `CORS_ORIGINS`. If the frontend uses HTTPS, serve the API over trusted HTTPS as well and set its URL explicitly. The phone workflow uses the operating system's file picker and a separate **Take a photo** input for browsers that support camera capture. It works without in-page camera APIs or a service worker. Use JPEG if the phone saves photos in HEIC. After generation, tap **Download PDF**, or use **Open PDF** and save it from the phone's PDF viewer.
 
+## Run the Phase 3 Expo app
+
+Use Node.js 22 LTS (22.13 or later) for the mobile tools. Install the web and backend dependencies from the one-time setup above, then install the mobile package.
+
+```bash
+cd /home/mridul/Desktop/priorproof
+npm ci
+npm ci --prefix mobile
+cd backend
+test -x .venv/bin/python || python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+Install [Expo Go for SDK 58](https://expo.dev/go) on the phone. Both devices must be able to reach the laptop over Wi-Fi. Expo's default Metro port is 8081. The example uses a separate SQLite database so the guided demo can start from its original state.
+
+```bash
+# Terminal 1, from the repository's backend directory
+LAN_IP=192.168.29.30
+export DEMO_ACCESS_KEY="$(openssl rand -hex 24)"
+printf 'PriorProof demo key %s\n' "$DEMO_ACCESS_KEY"
+DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
+  AI_PROVIDER=mock AGENT_PLANNER=disabled \
+  CORS_ORIGINS="http://$LAN_IP:3000" \
+  .venv/bin/python -m uvicorn app.main:app --host "$LAN_IP" --port 8000
+```
+
+```bash
+# Terminal 2, from the repository root
+LAN_IP=192.168.29.30
+NEXT_PUBLIC_API_URL= NEXT_TELEMETRY_DISABLED=1 npm run build
+NEXT_TELEMETRY_DISABLED=1 ./node_modules/.bin/next start --hostname "$LAN_IP"
+```
+
+```bash
+# Terminal 3, from the repository root
+cd mobile
+npx expo start --go --lan
+```
+
+Replace the example IP in both terminals with the laptop's private Wi-Fi IP. Open the Expo development QR with Expo Go (or the system camera on iOS), then enter `http://192.168.29.30:8000` and the access key in PriorProof. This development QR opens the app. The case QR displayed on the website opens a specific case after sign-in and owner verification. It contains only the opaque case UUID.
+
+On a trusted demo device, enable **Remember demo key on this device** when signing in to prefill the server and key next time. Turn the switch off on the sign-in screen to remove the saved key.
+
+LAN HTTP transmits the demo key, bearer sessions and records without encryption. Use only fictional records on trusted Wi-Fi. Real deployments require HTTPS and an appropriate staff identity and access model. The existing demo uses one shared account and one backend worker. Any staff using that account share its case access. Mobile stores the session in SecureStore and keeps case data in memory. Upload and PDF export cache copies are removed after use during normal navigation. Files saved or sent through the system share sheet are managed by the receiving app. For a native build outside Expo Go, use HTTPS, or configure platform-specific private LAN transport for a fictional demo.
+
+### Cross-device demo
+
+1. On the laptop, open `http://192.168.29.30:3000/workspace?case=guided`, sign in, and select **Start preparation** in **Agent Activity**. The agent pauses on **Insurance identification**.
+2. On the website, select **Show case QR**. In the signed-in Expo app, tap **Scan case QR** and scan it. The **Aarav Sharma** case is also available on the mobile home screen if the camera is unavailable.
+3. Download the existing fictional membership card to the phone from `http://192.168.29.30:3000/evaluation/aarav-membership.pdf`. In the case's **Agent tasks**, open **Insurance identification**, choose **Capture supporting document**, then **Choose PDF files**. Keep the preselected **Insurance identification** category and upload. A clear camera photo of the same fictional card also works when local OCR is available.
+4. Return to **Agent tasks** and select **Confirm update and resume** for the document. The same run analyzes the new case revision. The website polls approximately every four seconds and shows the checklist change and the updated readiness score. The admission-date conflict remains open for staff.
+5. Open the admission-date conflict and its two sources. Verify the **26 November 2026** admission-note value and reject the **27 November 2026** treatment-plan value. Return to the agent, confirm the update and resume. When the readiness checks pass, select **Approve draft preparation**. Open **Draft packet** on mobile to page through the preview or use **Save or share PDF**. The web panel also offers the draft download.
+
+The demo flow can be reset from the Trust Centre by deleting the prepared copy with patient ID `DEMO-GUIDED-1024` and reopening the guided workspace. Runs and case data persist in the demo SQLite file. After an API restart, sign in again and open the existing case to resume.
+
+### Agent architecture and API
+
+One LangGraph workflow inspects the case, checks document requirements, runs existing extraction when the document set needs analysis, detects conflicts, checks field evidence, computes readiness and requests staff input. SQLite persists checkpoints, tool results by reference, and revision-bound confirmations. Resume rechecks the latest authorized case. Extraction commits compare the expected revision and record the result atomically to prevent repeating a committed extraction after a restart. The graph bounds each activation to a 45-second cooperative execution budget and each run to 36 tool steps. The current implementation uses a single API worker.
+
+By default, the agent can ask loopback Ollama to prioritize among multiple eligible staff task types. Only task kinds, option numbers and counts enter the planner. Known prerequisites use deterministic rules. Missing, disabled or invalid planner responses fall back to deterministic selection and are labelled in the trace. To use the local planner, omit `AGENT_PLANNER=disabled` and configure `OLLAMA_MODEL` and `OLLAMA_BASE_URL` as described below. `AI_PROVIDER` controls the existing extraction service independently.
+
+Staff record document and evidence changes through the existing case endpoints. Human-input confirmation records a task ID, a case revision and explicit confirmation. Draft generation requires current staff approval and a readiness assessment without blockers. The agent's draft PDF route rejects stale revisions. Insurance decisions and the separate existing simulation action stay outside the agent tool allowlist.
+
+All routes below require an existing bearer session and case ownership. Agent paths are relative to `/api/cases/{caseId}/agent/runs`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/` | Start, or return the current active run |
+| GET | `/latest` | Latest run for this case, or null |
+| GET | `/{runId}` | Status, current revision and observable actions |
+| GET | `/{runId}/trace` | Completed tool actions and selection modes |
+| GET | `/{runId}/tasks` | Outstanding staff tasks |
+| POST | `/{runId}/input` | Confirm a task with `task_id`, `revision` and `confirmed: true` |
+| POST | `/{runId}/resume` | Resume an interrupted or recoverable run |
+| POST | `/{runId}/cancel` | Cancel a run |
+
+The existing document upload accepts an optional multipart UUID `upload_id` for safe retries. Field review and staff entry accept an optional `expectedRevision` for stale-write protection. The mobile PDF viewer uses `GET /api/cases/{caseId}/packet-preview?revision=…&page=1` and the approved download uses the existing `packet.pdf` endpoint with a revision query.
+
 ## Demonstrate the four stages
 
 1. **Create Case.** Enter a fictional patient and hospital. The seeded Aarav Sharma case also lets you start directly at review.
@@ -133,4 +211,11 @@ cd /home/mridul/Desktop/priorproof
 NEXT_TELEMETRY_DISABLED=1 npm run build
 cd backend
 .venv/bin/python -m unittest discover -s tests -v
+```
+
+```bash
+cd /home/mridul/Desktop/priorproof/mobile
+npm run typecheck
+npx expo-doctor@latest
+npx expo export --platform all
 ```
