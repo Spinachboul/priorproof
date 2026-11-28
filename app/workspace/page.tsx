@@ -4,7 +4,7 @@ import { EvidenceGraph, ReadinessPanel } from '../intelligence';
 import Link from 'next/link';
 import { Activity, AlertTriangle, ArrowRight, BriefcaseMedical, Check, CheckCircle2, ChevronRight, ClipboardCheck, Clock3, Download, FileText, FolderOpen, HeartPulse, LayoutDashboard, Plus, RefreshCw, ShieldCheck, Trash2, Upload, Wifi, X } from 'lucide-react';
 
-import { api } from '../client-api';
+import { api, DEMO_MODE, SESSION_KEY, signInDemo } from '../client-api';
 import { AgentActivity } from '../agent-activity';
 type Case = { id: string; patientName: string; patientId: string; age?: number; gender: string; hospitalName: string; admissionDate: string; department: string; insurer: string; policyNumber: string; policyType: string; tpa: string; reason: string; diagnosis: string; treatment: string; estimatedCost?: number; status: string; createdAt: string; updatedAt: string; submission?: any; documents?: Doc[]; fields?: Field[]; checklist?: any[]; conflicts?: any[]; reviewSummary?: any };
 type Doc = { id: string; filename: string; category: string; pages: number; status: string };
@@ -27,7 +27,39 @@ async function downloadFile(path: string, filename: string) {
 const badge = (s: string) => <span className={'badge ' + (s === 'Ready for Submission' || s === 'Completed' || s === 'Verified' ? 'b-green' : s === 'Missing Information' || s === 'Rejected' ? 'b-red' : s === 'Needs Review' || s === 'Unreviewed' ? 'b-amber' : s === 'Processing' ? 'b-blue' : 'b-gray')}>{s}</span>;
 export default function Home() {
     const [cases, setCases] = useState<Case[]>([]), [current, setCurrent] = useState<Case | null>(null), [page, setPage] = useState('Dashboard'), [loading, setLoading] = useState(true), [provider, setProvider] = useState('mock'), [toast, setToast] = useState(''), [modal, setModal] = useState(false), [processing, setProcessing] = useState(false), [search, setSearch] = useState(''), [authToken, setAuthToken] = useState(''), [authReady, setAuthReady] = useState(false);
-    useEffect(() => { setAuthToken(sessionStorage.getItem('priorproof-token') || ''); setAuthReady(true); const logout = () => { setAuthToken(''); setCurrent(null); setCases([]); setPage('Dashboard'); setModal(false) }; window.addEventListener('priorproof-logout', logout); return () => window.removeEventListener('priorproof-logout', logout) }, []);
+    const [authError, setAuthError] = useState('');
+    useEffect(() => {
+        setAuthToken(sessionStorage.getItem(SESSION_KEY) || '');
+        setAuthReady(true);
+        const logout = (event: Event) => {
+            setAuthError((event as CustomEvent<string>).detail || '');
+            setAuthToken('');
+            setCurrent(null);
+            setCases([]);
+            setPage('Dashboard');
+            setModal(false);
+        };
+        window.addEventListener('priorproof-logout', logout);
+        return () => window.removeEventListener('priorproof-logout', logout);
+    }, []);
+
+    useEffect(() => {
+        if (!DEMO_MODE || !authReady || authToken || authError) return;
+        let active = true;
+        signInDemo().then(token => {
+            if (!active) return;
+            sessionStorage.setItem(SESSION_KEY, token);
+            setLoading(true);
+            setAuthToken(token);
+        }).catch(error => { if (active) setAuthError((error as Error).message); });
+        return () => { active = false; };
+    }, [authReady, authToken, authError]);
+
+    function signOut() {
+        sessionStorage.removeItem(SESSION_KEY);
+        if (DEMO_MODE) window.location.replace('/');
+        else window.dispatchEvent(new Event('priorproof-logout'));
+    }
     useEffect(() => {
         if (!authToken) { setLoading(false); return; }
         if (process.env.NODE_ENV === 'production' && window.isSecureContext && 'serviceWorker' in navigator) {
@@ -49,7 +81,11 @@ export default function Home() {
                 if (detail) { setCurrent(detail); setPage('Case workspace'); }
                 if (selection === 'new') setModal(true);
             } catch (error) {
-                if (active) setToast((error as Error).message);
+                if (active) {
+                    const message = (error as Error).message;
+                    if (DEMO_MODE) setAuthError(message);
+                    else setToast(message);
+                }
             } finally {
                 if (active) setLoading(false);
             }
@@ -82,8 +118,20 @@ export default function Home() {
     const counts = useMemo(() => ({ total: cases.length, review: cases.filter(c => c.status === 'Needs Review').length, missing: cases.filter(c => c.status === 'Missing Information').length, complete: cases.filter(c => c.status === 'Completed').length }), [cases]);
     const menu = [['OVERVIEW', [['Dashboard', LayoutDashboard], ['All cases', FolderOpen]]], ['WORKSPACE', [['Documents', FileText], ['Review & evidence', ClipboardCheck], ['Evidence graph', Activity]]]] as any;
     if (!authReady) return <div className="shell"><div className="empty">Loading…</div></div>;
-    if (!authToken) return <Login onLogin={token => { sessionStorage.setItem('priorproof-token', token); setAuthToken(token); setLoading(true) }} />;
-    return <div className="shell"><aside className="sidebar"><Link href="/" className="brand workspace-brand"><div className="brandmark"><HeartPulse size={19} /></div>PriorProof</Link><nav>{menu.map(([section, items]: any) => <div key={section}><div className="navlabel">{section}</div>{items.map(([label, Icon]: any) => <button key={label} className={'navbtn ' + (page === label ? 'active' : '')} onClick={() => { if ((['Documents', 'Review & evidence', 'Evidence graph'].includes(label)) && !current) { setToast('Open a case first'); return } setPage(label) }}><Icon size={17} />{label}</button>)}</div>)}</nav><div className="sidebottom"><Link href="/trust">Trust Centre</Link><br /><Link href="/evaluation">Evaluation results</Link><br />Prototype · synthetic data by default<br /><span style={{ display: 'block', marginTop: 9 }}>Local AI provider: <b>{provider === 'ollama' ? 'Ollama' : 'Demo rules'}</b></span><button className="btn small" style={{ marginTop: 10 }} onClick={() => { sessionStorage.removeItem('priorproof-token'); window.dispatchEvent(new Event('priorproof-logout')) }}>Sign out</button></div><div className="mobilemenu"><button className="btn small" onClick={() => setPage('All cases')}>All cases</button><button className="btn small" onClick={() => { sessionStorage.removeItem('priorproof-token'); window.dispatchEvent(new Event('priorproof-logout')) }}>Sign out</button></div></aside>
+    if (DEMO_MODE && (!authToken || authError)) return <div className="shell" style={{ display: 'grid', placeItems: 'center', padding: 20 }}>
+        <section className="card" style={{ width: 'min(460px, 100%)' }}>
+            <h1>{authError ? 'Could not open the demo workspace' : 'Opening the demo workspace'}</h1>
+            {authError ? <><p role="alert">{authError}</p><button className="btn primary" onClick={() => {
+                sessionStorage.removeItem(SESSION_KEY);
+                setAuthToken('');
+                setAuthError('');
+            }}>Retry demo sign-in</button></>
+                : <p role="status">Connecting to the PriorProof backend…</p>}
+            <p><Link href="/">Back to PriorProof</Link></p>
+        </section>
+    </div>;
+    if (!authToken) return <Login onLogin={token => { sessionStorage.setItem(SESSION_KEY, token); setAuthToken(token); setLoading(true) }} />;
+    return <div className="shell"><aside className="sidebar"><Link href="/" className="brand workspace-brand"><div className="brandmark"><HeartPulse size={19} /></div>PriorProof</Link><nav>{menu.map(([section, items]: any) => <div key={section}><div className="navlabel">{section}</div>{items.map(([label, Icon]: any) => <button key={label} className={'navbtn ' + (page === label ? 'active' : '')} onClick={() => { if ((['Documents', 'Review & evidence', 'Evidence graph'].includes(label)) && !current) { setToast('Open a case first'); return } setPage(label) }}><Icon size={17} />{label}</button>)}</div>)}</nav><div className="sidebottom"><Link href="/trust">Trust Centre</Link><br /><Link href="/evaluation">Evaluation results</Link><br />Prototype · synthetic data by default<br /><span style={{ display: 'block', marginTop: 9 }}>Local AI provider: <b>{provider === 'ollama' ? 'Ollama' : 'Demo rules'}</b></span><button className="btn small" style={{ marginTop: 10 }} onClick={signOut}>Sign out</button></div><div className="mobilemenu"><button className="btn small" onClick={() => setPage('All cases')}>All cases</button><button className="btn small" onClick={signOut}>Sign out</button></div></aside>
         <main className="main"><header className="topbar"><div className="crumb">Hospital Operations&nbsp; / &nbsp;<b>{page}</b></div><div className="user"><span className="provider"><Wifi size={14} />{provider === 'ollama' ? 'Ollama · local' : 'Deterministic demo provider'}</span><div className="avatar">HD</div><span>Hospital Desk</span></div></header><div className="content">
             {page === 'Dashboard' && <Dashboard cases={cases} counts={counts} loading={loading} onNew={() => setModal(true)} onOpen={openCase} onAll={() => setPage('All cases')} />}
             {page === 'All cases' && <AllCases cases={cases} search={search} setSearch={setSearch} onOpen={openCase} onNew={() => setModal(true)} />}

@@ -18,24 +18,26 @@ Dependency installation needs internet access or a populated local package cache
 
 ## Start offline on the laptop
 
-The first start with an empty database seeds the fictional Aarav Sharma case. The terminal prints a fresh private key for each run. Use the existing SQLite database and upload directory under `backend/data/`, or set `DATABASE_PATH` and `UPLOAD_DIR` before starting to use separate demo storage.
+The first start with an empty database seeds the fictional Aarav Sharma case. The commands below use dedicated fictional demo storage and enable automatic website sign-in.
 
 ```bash
 # Terminal 1
 cd /home/mridul/Desktop/priorproof/backend
-export DEMO_ACCESS_KEY="$(openssl rand -hex 24)"
-printf 'PriorProof demo key %s\n' "$DEMO_ACCESS_KEY"
-AI_PROVIDER=mock .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
+  DEMO_LOGIN_ENABLED=1 AI_PROVIDER=mock \
+  .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 ```bash
 # Terminal 2
 cd /home/mridul/Desktop/priorproof
-NEXT_PUBLIC_API_URL= NEXT_TELEMETRY_DISABLED=1 npm run build
+NEXT_PUBLIC_API_URL= NEXT_TELEMETRY_DISABLED=1 npm run build:demo
 NEXT_TELEMETRY_DISABLED=1 npm run start
 ```
 
-Open [PriorProof on the laptop](http://127.0.0.1:3000) and select **Prepare a Cashless Request** to sign in with the key printed in terminal 1. Use `npm run dev` in place of the build and start commands when developing locally. For a persistent key or other settings, copy `backend/.env.example` to `backend/.env` if one does not already exist and replace the example key. Shell environment variables take precedence.
+Open [PriorProof on the laptop](http://127.0.0.1:3000) and select **Prepare a Cashless Request**. The website signs in automatically, including when you open `/workspace` directly or select **Start Guided Demo**. Use `npm run dev:demo` in place of the build and start commands when developing locally.
+
+The demo scripts set `NEXT_PUBLIC_DEMO_MODE=1`. Production builds embed this value at build time. Use both flags only with fictional data and dedicated demo storage. To use manual access-key sign-in, leave `NEXT_PUBLIC_DEMO_MODE` unset, use `npm run dev` or `npm run build`, and start the backend with `DEMO_LOGIN_ENABLED=0` and a private `DEMO_ACCESS_KEY`. Shell environment variables take precedence over `backend/.env`.
 
 The demo uses one shared account. FastAPI checks the signed bearer session and case ownership before serving case data, source files, or packets. Sessions expire after 12 hours or at a backend restart. Use one API worker for the demo session and background processing state. SQLite and original documents are stored locally on disk.
 
@@ -47,9 +49,8 @@ Find the laptop's private Wi-Fi address with `ip -4 -br addr`. Use the same addr
 # Terminal 1
 cd /home/mridul/Desktop/priorproof/backend
 LAN_IP=192.168.29.30
-export DEMO_ACCESS_KEY="$(openssl rand -hex 24)"
-printf 'PriorProof demo key %s\n' "$DEMO_ACCESS_KEY"
-AI_PROVIDER=mock CORS_ORIGINS="http://$LAN_IP:3000" \
+DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
+  DEMO_LOGIN_ENABLED=1 AI_PROVIDER=mock CORS_ORIGINS="http://$LAN_IP:3000" \
   .venv/bin/python -m uvicorn app.main:app --host "$LAN_IP" --port 8000
 ```
 
@@ -60,7 +61,7 @@ LAN_IP=192.168.29.30
 NEXT_TELEMETRY_DISABLED=1 ./node_modules/.bin/next start --hostname "$LAN_IP"
 ```
 
-Open `http://192.168.29.30:3000` on the phone. Both devices need to be on the same trusted Wi-Fi with laptop TCP ports 3000 and 8000 reachable. The frontend uses the same hostname on port 8000 by default. `CORS_ORIGINS` lists exact browser origins. Access still requires a valid session. HTTP sends the demo key, session, and case data over the network without transport encryption. Keep this setup on trusted Wi-Fi and use only fictional records.
+Open `http://192.168.29.30:3000` on the phone. Both devices need to be on the same trusted Wi-Fi with laptop TCP ports 3000 and 8000 reachable. The frontend uses the same hostname on port 8000 by default. `CORS_ORIGINS` lists exact browser origins. Access still requires a valid session. HTTP sends credentials, sessions and case data over the network without transport encryption. Keep this setup on trusted Wi-Fi and use only fictional records.
 
 For different hosts or ports, set `NEXT_PUBLIC_API_URL` before building the frontend and include the exact frontend origin in `CORS_ORIGINS`. If the frontend uses HTTPS, serve the API over trusted HTTPS as well and set its URL explicitly. The phone workflow uses the operating system's file picker and a separate **Take a photo** input for browsers that support camera capture. It works without in-page camera APIs or a service worker. Use JPEG if the phone saves photos in HEIC. After generation, tap **Download PDF**, or use **Open PDF** and save it from the phone's PDF viewer.
 
@@ -82,8 +83,6 @@ Install [Expo Go for SDK 58](https://expo.dev/go) on the phone. Both devices mus
 ```bash
 # Terminal 1, from the repository's backend directory
 LAN_IP=192.168.29.30
-export DEMO_ACCESS_KEY="$(openssl rand -hex 24)"
-printf 'PriorProof demo key %s\n' "$DEMO_ACCESS_KEY"
 DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
   AI_PROVIDER=mock AGENT_PLANNER=disabled DEMO_LOGIN_ENABLED=1 \
   CORS_ORIGINS="http://$LAN_IP:3000" \
@@ -93,31 +92,31 @@ DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
 ```bash
 # Terminal 2, from the repository root
 LAN_IP=192.168.29.30
-NEXT_PUBLIC_API_URL= NEXT_TELEMETRY_DISABLED=1 npm run build
+NEXT_PUBLIC_API_URL= NEXT_TELEMETRY_DISABLED=1 npm run build:demo
 NEXT_TELEMETRY_DISABLED=1 ./node_modules/.bin/next start --hostname "$LAN_IP"
 ```
 
 ```bash
 # Terminal 3, from the repository root
 cd mobile
-npx expo start --go --lan
+EXPO_PUBLIC_API_URL=http://192.168.29.30:8000 npx expo start --go --lan
 ```
 
-Replace the example IP in both terminals with the laptop's private Wi-Fi IP. Open the Expo development QR with Expo Go (or the system camera on iOS), then enter `http://192.168.29.30:8000` and the access key in PriorProof. This development QR opens the app. The case QR displayed on the website opens a specific case after sign-in and owner verification. It contains only the opaque case UUID.
+Replace the example IP in all three terminals with the laptop's private LAN IP. Open the Expo development QR with Expo Go (or the system camera on iOS), confirm that the backend URL matches the website's API, and tap **Sign in as demo user**. This development QR opens the app. The case QR displayed on the website opens a specific case after sign-in and owner verification. It contains only the opaque case UUID.
 
-With `DEMO_LOGIN_ENABLED=1` and fictional storage, select **Sign in as demo user** in the mobile app. It submits `user1` and `abc123` and receives a normal session. The mobile app suggests Metro’s LAN address on port 8001 for a standalone demo backend. Enter port 8000 when following the combined web and mobile setup above, or set `EXPO_PUBLIC_API_URL` when starting Metro to prefill that URL. The website uses the configured access key.
+Both clients use the same backend, database and demo account. Both submit `user1` and `abc123` to the existing login endpoint and receive a bearer session. The website renews an expired demo session automatically. Expo's standalone fallback suggests port 8001 if no API URL is configured. Use port 8000 for this combined setup.
 
 LAN HTTP transmits the demo key, bearer sessions and records without encryption. Use only fictional records on trusted Wi-Fi. Real deployments require HTTPS and an appropriate staff identity and access model. The existing demo uses one shared account and one backend worker. Any staff using that account share its case access. Mobile stores the session in SecureStore and keeps case data in memory. Upload and PDF export cache copies are removed after use during normal navigation. Files saved or sent through the system share sheet are managed by the receiving app. For a native build outside Expo Go, use HTTPS, or configure platform-specific private LAN transport for a fictional demo.
 
 ### Cross-device demo
 
-1. On the laptop, open `http://192.168.29.30:3000/workspace?case=guided`, sign in, and select **Start preparation** in **Agent Activity**. The agent pauses on **Insurance identification**.
+1. On the laptop, open `http://192.168.29.30:3000/workspace?case=guided`. After automatic sign-in, select **Start preparation** in **Agent Activity**. The agent pauses on **Insurance identification**.
 2. On the website, select **Show case QR**. In the signed-in Expo app, tap **Scan case QR** and scan it. The **Aarav Sharma** case is also available on the mobile home screen if the camera is unavailable.
 3. Download the existing fictional membership card to the phone from `http://192.168.29.30:3000/evaluation/aarav-membership.pdf`. In the case's **Agent tasks**, open **Insurance identification**, choose **Capture supporting document**, then **Choose PDF files**. Keep the preselected **Insurance identification** category and upload. A clear camera photo of the same fictional card also works when local OCR is available.
 4. Return to **Agent tasks** and select **Confirm update and resume** for the document. The same run analyzes the new case revision. The website polls approximately every four seconds and shows the checklist change and the updated readiness score. The admission-date conflict remains open for staff.
 5. Open the admission-date conflict and its two sources. Verify the **26 November 2026** admission-note value and reject the **27 November 2026** treatment-plan value. Return to the agent, confirm the update and resume. When the readiness checks pass, select **Approve draft preparation**. Open **Draft packet** on mobile to page through the preview or use **Save or share PDF**. The web panel also offers the draft download.
 
-The demo flow can be reset from the Trust Centre by deleting the prepared copy with patient ID `DEMO-GUIDED-1024` and reopening the guided workspace. Runs and case data persist in the demo SQLite file. After an API restart, sign in again and open the existing case to resume.
+The demo flow can be reset from the Trust Centre by deleting the prepared copy with patient ID `DEMO-GUIDED-1024` and reopening the guided workspace. Runs and case data persist in the demo SQLite file. After an API restart, the website renews its demo session and Expo prompts for demo sign-in again.
 
 ### Agent architecture and API
 
