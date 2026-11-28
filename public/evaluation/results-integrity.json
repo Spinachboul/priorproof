@@ -1,0 +1,316 @@
+{
+  "provider": "deterministic",
+  "synthetic": true,
+  "scenarios": 16,
+  "exactScenarios": 16,
+  "exactValues": 28,
+  "valuesCompared": 28,
+  "evidenceReferenceChecks": {
+    "supported": 98,
+    "total": 98
+  },
+  "unknownChecks": {
+    "correct": 11,
+    "total": 11
+  },
+  "classifications": {
+    "authorization drift": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "tn": 14,
+      "precision": 1.0,
+      "recall": 1.0,
+      "falsePositiveRate": 0.0
+    },
+    "payment variance": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "tn": 14,
+      "precision": 1.0,
+      "recall": 1.0,
+      "falsePositiveRate": 0.0
+    }
+  },
+  "meanCalculationMs": 0.0108,
+  "cases": [
+    {
+      "scenario": "initial authorization aligned",
+      "exact": true,
+      "expectedAmounts": {
+        "authorization_gap": 0
+      },
+      "actualAmounts": {
+        "authorization_gap": 0
+      },
+      "expectedFindings": [],
+      "actualFindings": []
+    },
+    {
+      "scenario": "revised estimate exceeds authorization",
+      "exact": true,
+      "expectedAmounts": {
+        "authorization_gap": 4500000
+      },
+      "actualAmounts": {
+        "authorization_gap": 4500000
+      },
+      "expectedFindings": [
+        "authorization-drift"
+      ],
+      "actualFindings": [
+        "authorization-drift"
+      ]
+    },
+    {
+      "scenario": "verified enhancement supersedes earlier authorization",
+      "exact": true,
+      "expectedAmounts": {
+        "authorization_gap": 2500000
+      },
+      "actualAmounts": {
+        "authorization_gap": 2500000
+      },
+      "expectedFindings": [
+        "authorization-drift"
+      ],
+      "actualFindings": [
+        "authorization-drift"
+      ]
+    },
+    {
+      "scenario": "verified threshold does not require an enhancement review",
+      "exact": true,
+      "expectedAmounts": {
+        "authorization_gap": 2500000
+      },
+      "actualAmounts": {
+        "authorization_gap": 2500000
+      },
+      "expectedFindings": [],
+      "actualFindings": []
+    },
+    {
+      "scenario": "competing authorization records",
+      "exact": true,
+      "expectedAmounts": {
+        "authorization_gap": null
+      },
+      "actualAmounts": {
+        "authorization_gap": null
+      },
+      "expectedFindings": [
+        "conflict-authorization"
+      ],
+      "actualFindings": [
+        "conflict-authorization"
+      ]
+    },
+    {
+      "scenario": "missing hospital agreement",
+      "exact": true,
+      "expectedAmounts": {
+        "expected": null,
+        "responsibility": null
+      },
+      "actualAmounts": {
+        "expected": null,
+        "responsibility": null
+      },
+      "expectedFindings": [
+        "missing-agreement",
+        "responsibility-unknown"
+      ],
+      "actualFindings": [
+        "missing-agreement",
+        "responsibility-unknown"
+      ]
+    },
+    {
+      "scenario": "unrecognized reimbursement rule",
+      "exact": true,
+      "expectedAmounts": {
+        "expected": null,
+        "responsibility": 1000000
+      },
+      "actualAmounts": {
+        "expected": null,
+        "responsibility": 1000000
+      },
+      "expectedFindings": [
+        "contract-rule"
+      ],
+      "actualFindings": [
+        "contract-rule"
+      ]
+    },
+    {
+      "scenario": "explicit policy cap",
+      "exact": true,
+      "expectedAmounts": {
+        "expected": 8250000,
+        "responsibility": 1000000
+      },
+      "actualAmounts": {
+        "expected": 8250000,
+        "responsibility": 1000000
+      },
+      "expectedFindings": [],
+      "actualFindings": []
+    },
+    {
+      "scenario": "settlement reconciles exactly",
+      "exact": true,
+      "expectedAmounts": {
+        "expected": 9000000,
+        "received": 9000000,
+        "variance": null,
+        "responsibility": 1000000
+      },
+      "actualAmounts": {
+        "expected": 9000000,
+        "received": 9000000,
+        "variance": null,
+        "responsibility": 1000000
+      },
+      "expectedFindings": [],
+      "actualFindings": []
+    },
+    {
+      "scenario": "potential payment variance",
+      "exact": true,
+      "expectedAmounts": {
+        "variance": 800000,
+        "responsibility": 1000000
+      },
+      "actualAmounts": {
+        "variance": 800000,
+        "responsibility": 1000000
+      },
+      "expectedFindings": [
+        "payment-variance"
+      ],
+      "actualFindings": [
+        "payment-variance"
+      ]
+    },
+    {
+      "scenario": "potential overpayment with paise",
+      "exact": true,
+      "expectedAmounts": {
+        "variance": -100001
+      },
+      "actualAmounts": {
+        "variance": -100001
+      },
+      "expectedFindings": [
+        "payment-variance"
+      ],
+      "actualFindings": [
+        "payment-variance"
+      ]
+    },
+    {
+      "scenario": "partial payment remains outstanding",
+      "exact": true,
+      "expectedAmounts": {
+        "outstanding": 800000,
+        "variance": null
+      },
+      "actualAmounts": {
+        "outstanding": 800000,
+        "variance": null
+      },
+      "expectedFindings": [
+        "outstanding-payment"
+      ],
+      "actualFindings": [
+        "outstanding-payment"
+      ]
+    },
+    {
+      "scenario": "final advice exceeds confirmed receipts",
+      "exact": true,
+      "expectedAmounts": {
+        "outstanding": 800000,
+        "variance": null
+      },
+      "actualAmounts": {
+        "outstanding": 800000,
+        "variance": null
+      },
+      "expectedFindings": [
+        "outstanding-payment",
+        "remittance-mismatch"
+      ],
+      "actualFindings": [
+        "outstanding-payment",
+        "remittance-mismatch"
+      ]
+    },
+    {
+      "scenario": "settlement with no receipt yet",
+      "exact": true,
+      "expectedAmounts": {
+        "received": null,
+        "variance": null
+      },
+      "actualAmounts": {
+        "received": null,
+        "variance": null
+      },
+      "expectedFindings": [
+        "missing-payment"
+      ],
+      "actualFindings": [
+        "missing-payment"
+      ]
+    },
+    {
+      "scenario": "payment reversal",
+      "exact": true,
+      "expectedAmounts": {
+        "received": 8799995,
+        "outstanding": 200005
+      },
+      "actualAmounts": {
+        "received": 8799995,
+        "outstanding": 200005
+      },
+      "expectedFindings": [
+        "outstanding-payment",
+        "remittance-mismatch"
+      ],
+      "actualFindings": [
+        "outstanding-payment",
+        "remittance-mismatch"
+      ]
+    },
+    {
+      "scenario": "revised bill contradicts agreement",
+      "exact": true,
+      "expectedAmounts": {
+        "expected": null,
+        "variance": null
+      },
+      "actualAmounts": {
+        "expected": null,
+        "variance": null
+      },
+      "expectedFindings": [
+        "bill-inconsistent",
+        "responsibility-under-review"
+      ],
+      "actualFindings": [
+        "bill-inconsistent",
+        "responsibility-under-review"
+      ]
+    }
+  ],
+  "limitations": [
+    "Fixtures supply verified records directly. The evidence score checks case event linkage, not extraction or clinical correctness.",
+    "API ordering, privacy, deletion, agent resumption and simulation isolation are tested separately.",
+    "This synthetic benchmark measures the calculation only. It provides no evidence of hospital performance."
+  ]
+}

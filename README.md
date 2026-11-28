@@ -1,13 +1,47 @@
 # PriorProof
 
-PriorProof is a local-first prototype for preparing evidence-linked hospital cashless pre-authorization drafts. It helps hospital desk staff collect records, review extracted facts, resolve conflicting values, and export a PDF for human review. Use fictional data for the demo. Submission only creates a local simulation reference.
+PriorProof is a local-first hospital-side prototype for preparing cashless pre-authorization drafts and tracking authorization, billing and settlement evidence over a claim’s lifecycle. It helps hospital desk staff collect records, review extracted facts, resolve conflicting values, and export a PDF for human review. Use fictional data for the demo. Submission only creates a local simulation reference.
+
+## Claim Integrity demonstration
+
+The existing guided pre-authorization scenario remains available at `/workspace?case=guided`. **Aarav’s Complete Financial Journey** is a separate synthetic case at `/workspace?case=financial`. Restart the backend after updating, so the additive SQLite migration runs. Start both demo flags using the offline or Expo commands below. Use `AI_PROVIDER=mock AGENT_PLANNER=disabled` for a predictable run.
+
+1. Open **Claim Integrity** from the Dashboard link or go to `http://localhost:3000/workspace?case=financial`. Confirm the next fictional document through admission, ₹85,000 initial estimate, ₹70,000 initial authorization and ₹1,15,000 revised estimate.
+2. Inspect the ₹45,000 estimate-to-authorization difference. In **What-if**, enter a ₹90,000 revised authorization to see a hypothetical ₹25,000 difference. Then confirm the actual fictional enhancement request and revised authorization. Expand the original authorization to see its retained evidence.
+3. Record the ₹1,15,000 final bill, fictional agreement, settlement advice and first ₹82,000 receipt. See the verified ₹15,000 adjustment, ₹1,00,000 allowable amount, ₹10,000 patient responsibility, ₹90,000 expected reimbursement and ₹8,000 potential payer variance.
+4. Inspect the variance and its source pages in **Financial evidence graph**. Optional: start integrity review in **Agent Activity**. Simulate an extra ₹8,000 payment. The recorded receipts stay at ₹82,000.
+5. Confirm the actual fictional additional payment, revised settlement advice and administrative resolution. The recorded total is ₹90,000 and the payment variance clears. The ₹10,000 patient responsibility remains unchanged. Resume an active integrity agent run only after confirming an updated source.
+6. In **Outcomes**, record the additional payment using its confirmation, then the administrative resolution using its resolution evidence. The synthetic workflow shows a candidate follow-up rule requiring staff review.
+7. Review the minimized **Patient financial summary**, confirm staff review, and download the three PDFs. **Reset financial journey** deletes only this fictional case and reopens it in its initial state, subject to the existing retention restrictions.
+
+Financial records require a confirmed case source page and revision. The **Financial claim evidence** category is available in web and Expo. On an ordinary case, use **Case privacy** to confirm financial processing, upload a structured source and record it in Claim Integrity. Expo can show the minimized summary and resume financial review tasks after verification in the web workspace.
+
+Reproduce the deterministic benchmark from the repository root:
+
+```bash
+backend/.venv/bin/python evaluation/run_integrity.py --output public/evaluation/results-integrity.json
+```
+
+The deterministic benchmark is separate from the existing mock/Ollama extraction runs and uses supplied evidence fixtures. See the [architecture, document format and API](docs/claim-integrity-architecture.md), [commercial shadow-mode pilot](docs/claim-integrity-commercial-pilot.md) and [development report](docs/claim-integrity-development-report.md). Named payer rules are fictional, with generic verification as the fallback. A synthetic Northstar case can propose, approve and pin an applicable rule version in Authorization drift. Production identity, security, tariff modeling and interoperability require further work and organizational approval.
+
+## Public website
+
+The educational pages work without a session. The public navigation leads to:
+
+- `/` and `/journey` for the fictional Aarav Sharma story.
+- `/product` for the interactive preparation workflow, published benchmark summary, guided demo and developer setup.
+- `/industry` for sourced India insurance figures, the cashless workflow and three documented examples. The cashless settlement estimate is labelled as derived. The Bengaluru example is based on the original newspaper report.
+- `/solutions` and `/market` for prospective stakeholder groups and links to six vendors’ own product descriptions.
+- `/business-value` for staff capacity and annual recurring revenue scenarios, the proposed roadmap and a downloadable pilot enquiry brief. The calculators use hypothetical inputs and require pilot validation.
+- `/trust` and `/evaluation` for privacy controls, remaining regulatory readiness work and separate published Ollama and mock results.
+
+**Experience PriorProof** opens a new fictional case. **Start Guided Demo** opens the prepared copy. Both go to the existing `/workspace`. Case records, original documents, case audit activity and generated packets require a valid bearer session and case authorization. The evaluation downloads are published synthetic fixtures. Public content and charts use local assets after installation. External source links require internet access.
 
 ## One-time setup
 
-Use Python 3.10+, Node.js 20+, npm, and OpenSSL. Install the system Tesseract executable and its English language data if you want OCR for photos and scanned PDF pages.
+From the repository root, use Python 3.10+, Node.js 22 LTS (22.13 or later), npm, and OpenSSL. Install the system Tesseract executable and its English language data if you want OCR for photos and scanned PDF pages.
 
 ```bash
-cd /home/mridul/Desktop/priorproof
 npm ci
 cd backend
 python3 -m venv .venv
@@ -18,11 +52,11 @@ Dependency installation needs internet access or a populated local package cache
 
 ## Start offline on the laptop
 
-The first start with an empty database seeds the fictional Aarav Sharma case. The commands below use dedicated fictional demo storage and enable automatic website sign-in.
+Start each terminal at the repository root. The first start with an empty database seeds the fictional Aarav Sharma case. The commands below use dedicated fictional demo storage and enable automatic website sign-in.
 
 ```bash
 # Terminal 1
-cd /home/mridul/Desktop/priorproof/backend
+cd backend
 DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
   DEMO_LOGIN_ENABLED=1 AI_PROVIDER=mock \
   .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
@@ -30,12 +64,11 @@ DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
 
 ```bash
 # Terminal 2
-cd /home/mridul/Desktop/priorproof
 NEXT_PUBLIC_API_URL= NEXT_TELEMETRY_DISABLED=1 npm run build:demo
 NEXT_TELEMETRY_DISABLED=1 npm run start
 ```
 
-Open [PriorProof on the laptop](http://127.0.0.1:3000) and select **Prepare a Cashless Request**. The website signs in automatically, including when you open `/workspace` directly or select **Start Guided Demo**. Use `npm run dev:demo` in place of the build and start commands when developing locally.
+Open [PriorProof on the laptop](http://127.0.0.1:3000) and select **Experience PriorProof** or choose **Prepare a Cashless Request** on the Product page. The website signs in automatically, including when you open `/workspace` directly or select **Start Guided Demo**. Use `npm run dev:demo` in place of the build and start commands when developing locally.
 
 The demo scripts set `NEXT_PUBLIC_DEMO_MODE=1`. Production builds embed this value at build time. Use both flags only with fictional data and dedicated demo storage. To use manual access-key sign-in, leave `NEXT_PUBLIC_DEMO_MODE` unset, use `npm run dev` or `npm run build`, and start the backend with `DEMO_LOGIN_ENABLED=0` and a private `DEMO_ACCESS_KEY`. Shell environment variables take precedence over `backend/.env`.
 
@@ -43,25 +76,30 @@ The demo uses one shared account. FastAPI checks the signed bearer session and c
 
 ## Run the phone demo over Wi-Fi
 
-Find the laptop's private Wi-Fi address with `ip -4 -br addr`. Use the same address in both terminals. The example below uses `192.168.29.30`; substitute the current Wi-Fi address if it changes.
+Start each terminal at the repository root. In each terminal, look up your laptop’s LAN address:
+
+```bash
+LAN_IP=$(ip -4 route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1);exit}}')
+printf '%s\n' "$LAN_IP"
+```
+
+Check the address against `ip -4 -br addr`. If the default route points to a VPN or a different interface, set `LAN_IP` to the address shown for the Wi-Fi interface in each terminal.
 
 ```bash
 # Terminal 1
-cd /home/mridul/Desktop/priorproof/backend
-LAN_IP=192.168.29.30
+cd backend
 DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
   DEMO_LOGIN_ENABLED=1 AI_PROVIDER=mock CORS_ORIGINS="http://$LAN_IP:3000" \
   .venv/bin/python -m uvicorn app.main:app --host "$LAN_IP" --port 8000
 ```
 
 ```bash
-# Terminal 2, after the build above
-cd /home/mridul/Desktop/priorproof
-LAN_IP=192.168.29.30
-NEXT_TELEMETRY_DISABLED=1 ./node_modules/.bin/next start --hostname "$LAN_IP"
+# Terminal 2, at the repository root
+NEXT_PUBLIC_API_URL="http://$LAN_IP:8000" NEXT_TELEMETRY_DISABLED=1 npm run build:demo
+NEXT_TELEMETRY_DISABLED=1 ./node_modules/.bin/next start --hostname "$LAN_IP" --port 3000
 ```
 
-Open `http://192.168.29.30:3000` on the phone. Both devices need to be on the same trusted Wi-Fi with laptop TCP ports 3000 and 8000 reachable. The frontend uses the same hostname on port 8000 by default. `CORS_ORIGINS` lists exact browser origins. Access still requires a valid session. HTTP sends credentials, sessions and case data over the network without transport encryption. Keep this setup on trusted Wi-Fi and use only fictional records.
+Open `http://<LAN_IP>:8000/api/health` in the phone browser first, substituting the address you found. After it returns JSON, open `http://<LAN_IP>:3000` on the phone. Both devices need to be on the same trusted Wi-Fi with laptop TCP ports 3000 and 8000 reachable. The frontend uses the same hostname on port 8000 by default. `CORS_ORIGINS` lists exact browser origins. Access still requires a valid session. HTTP sends credentials, sessions and case data over the network without transport encryption. Keep this setup on trusted Wi-Fi and use only fictional records.
 
 For different hosts or ports, set `NEXT_PUBLIC_API_URL` before building the frontend and include the exact frontend origin in `CORS_ORIGINS`. If the frontend uses HTTPS, serve the API over trusted HTTPS as well and set its URL explicitly. The phone workflow uses the operating system's file picker and a separate **Take a photo** input for browsers that support camera capture. It works without in-page camera APIs or a service worker. Use JPEG if the phone saves photos in HEIC. After generation, tap **Download PDF**, or use **Open PDF** and save it from the phone's PDF viewer.
 
@@ -70,7 +108,6 @@ For different hosts or ports, set `NEXT_PUBLIC_API_URL` before building the fron
 Use Node.js 22 LTS (22.13 or later) for the mobile tools. Install the web and backend dependencies from the one-time setup above, then install the mobile package.
 
 ```bash
-cd /home/mridul/Desktop/priorproof
 npm ci
 npm ci --prefix mobile
 cd backend
@@ -78,11 +115,11 @@ test -x .venv/bin/python || python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Install [Expo Go for SDK 58](https://expo.dev/go) on the phone. Both devices must be able to reach the laptop over Wi-Fi. Expo's default Metro port is 8081. The example uses a separate SQLite database so the guided demo can start from its original state.
+Set the LAN address in each terminal as described above. Install [Expo Go for SDK 58](https://expo.dev/go) on the phone. Both devices must be able to reach the laptop over Wi-Fi. Expo's default Metro port is 8081. The example uses a separate SQLite database so the guided demo can start from its original state.
 
 ```bash
-# Terminal 1, from the repository's backend directory
-LAN_IP=192.168.29.30
+# Terminal 1, from the repository root
+cd backend
 DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
   AI_PROVIDER=mock AGENT_PLANNER=disabled DEMO_LOGIN_ENABLED=1 \
   CORS_ORIGINS="http://$LAN_IP:3000" \
@@ -91,18 +128,17 @@ DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
 
 ```bash
 # Terminal 2, from the repository root
-LAN_IP=192.168.29.30
-NEXT_PUBLIC_API_URL= NEXT_TELEMETRY_DISABLED=1 npm run build:demo
-NEXT_TELEMETRY_DISABLED=1 ./node_modules/.bin/next start --hostname "$LAN_IP"
+NEXT_PUBLIC_API_URL="http://$LAN_IP:8000" NEXT_TELEMETRY_DISABLED=1 npm run build:demo
+NEXT_TELEMETRY_DISABLED=1 ./node_modules/.bin/next start --hostname "$LAN_IP" --port 3000
 ```
 
 ```bash
 # Terminal 3, from the repository root
 cd mobile
-EXPO_PUBLIC_API_URL=http://192.168.29.30:8000 npx expo start --go --lan
+EXPO_PUBLIC_API_URL="http://$LAN_IP:8000" npx expo start --go --lan
 ```
 
-Replace the example IP in all three terminals with the laptop's private LAN IP. Open the Expo development QR with Expo Go (or the system camera on iOS), confirm that the backend URL matches the website's API, and tap **Sign in as demo user**. This development QR opens the app. The case QR displayed on the website opens a specific case after sign-in and owner verification. It contains only the opaque case UUID.
+Set `LAN_IP` in all three terminals using the lookup above. Open `http://<LAN_IP>:8000/api/health` on the phone and check for JSON before starting Expo. If the page fails, check the API bind address, firewall and whether Wi-Fi isolates clients. Open the Expo development QR with Expo Go (or the system camera on iOS), confirm that the backend URL matches the website's API, and tap **Sign in as demo user**. This development QR opens the app. The case QR displayed on the website opens a specific case after sign-in and owner verification. It contains only the opaque case UUID.
 
 Both clients use the same backend, database and demo account. Both submit `user1` and `abc123` to the existing login endpoint and receive a bearer session. The website renews an expired demo session automatically. Expo's standalone fallback suggests port 8001 if no API URL is configured. Use port 8000 for this combined setup.
 
@@ -110,9 +146,9 @@ LAN HTTP transmits the demo key, bearer sessions and records without encryption.
 
 ### Cross-device demo
 
-1. On the laptop, open `http://192.168.29.30:3000/workspace?case=guided`. After automatic sign-in, select **Start preparation** in **Agent Activity**. The agent pauses on **Insurance identification**.
+1. On the laptop, open `http://<LAN_IP>:3000/workspace?case=guided`. After automatic sign-in, select **Start preparation** in **Agent Activity**. The agent pauses on **Insurance identification**.
 2. On the website, select **Show case QR**. In the signed-in Expo app, tap **Scan case QR** and scan it. The **Aarav Sharma** case is also available on the mobile home screen if the camera is unavailable.
-3. Download the existing fictional membership card to the phone from `http://192.168.29.30:3000/evaluation/aarav-membership.pdf`. In the case's **Agent tasks**, open **Insurance identification**, choose **Capture supporting document**, then **Choose PDF files**. Keep the preselected **Insurance identification** category and upload. A clear camera photo of the same fictional card also works when local OCR is available.
+3. Download the existing fictional membership card to the phone from `http://<LAN_IP>:3000/evaluation/aarav-membership.pdf`. In the case's **Agent tasks**, open **Insurance identification**, choose **Capture supporting document**, then **Choose PDF files**. Keep the preselected **Insurance identification** category and upload. A clear camera photo of the same fictional card also works when local OCR is available.
 4. Return to **Agent tasks** and select **Confirm update and resume** for the document. The same run analyzes the new case revision. The website polls approximately every four seconds and shows the checklist change and the updated readiness score. The admission-date conflict remains open for staff.
 5. Open the admission-date conflict and its two sources. Verify the **26 November 2026** admission-note value and reject the **27 November 2026** treatment-plan value. Return to the agent, confirm the update and resume. When the readiness checks pass, select **Approve draft preparation**. Open **Draft packet** on mobile to page through the preview or use **Save or share PDF**. The web panel also offers the draft download.
 
@@ -181,7 +217,6 @@ Accepted machine values require an explicit label, a matching full value and an 
 ## Reproduce the benchmark
 
 ```bash
-cd /home/mridul/Desktop/priorproof
 backend/.venv/bin/python evaluation/generate.py
 backend/.venv/bin/python evaluation/run.py --provider mock
 OLLAMA_BASE_URL=http://127.0.0.1:11434 backend/.venv/bin/python evaluation/run.py --provider ollama --model qwen3:4b
@@ -223,8 +258,10 @@ Detector classifications and additional contextual identifiers are configured in
 
 ## Run the checks
 
+Start each block from the repository root.
+
 ```bash
-cd /home/mridul/Desktop/priorproof
+npm run test:roi
 ./node_modules/.bin/tsc --noEmit --incremental false
 NEXT_TELEMETRY_DISABLED=1 npm run build
 cd backend
@@ -232,7 +269,7 @@ cd backend
 ```
 
 ```bash
-cd /home/mridul/Desktop/priorproof/mobile
+cd mobile
 npm run typecheck
 npx expo-doctor@latest
 npx expo export --platform all

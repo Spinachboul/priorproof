@@ -27,14 +27,17 @@ const names: Record<string, string> = {
     check_requirements: 'Check required documents', detect_conflicts: 'Detect conflicts',
     evaluate_readiness: 'Evaluate readiness', request_human_input: 'Request staff input',
     generate_draft_packet: 'Prepare draft packet',
+    inspect_claim_lifecycle: 'Inspect claim lifecycle', reconcile_financial_state: 'Reconcile verified financial evidence',
+    prepare_integrity_report: 'Prepare for report review',
 };
 const labels: Record<string, string> = {
     missing_document: 'Upload document', missing_field: 'Supply source or staff-verified value',
-    conflict: 'Resolve conflict', verify_evidence: 'Review evidence', approve_draft: 'Approve PDF draft preparation',
+    conflict: 'Resolve conflict', verify_evidence: 'Review evidence', approve_draft: 'Approve PDF draft preparation', integrity_review: 'Verify new financial evidence',
 };
 
-export function AgentActivity({ caseId, refresh, navigate, openEvidence }: {
+export function AgentActivity({ caseId, refresh, navigate, openEvidence, mode = 'preauthorization' }: {
     caseId: string;
+    mode?: 'integrity' | 'preauthorization';
     refresh: () => Promise<void>;
     navigate: (page: string, target?: string) => void;
     openEvidence: (fieldId: string) => void;
@@ -45,6 +48,7 @@ export function AgentActivity({ caseId, refresh, navigate, openEvidence }: {
     const [error, setError] = useState('');
     const [qrCode, setQrCode] = useState('');
     const base = `/api/cases/${caseId}/agent/runs`;
+    const modeQuery = mode === 'integrity' ? '?mode=integrity' : '';
 
     useEffect(() => {
         if (busy) return;
@@ -52,7 +56,7 @@ export function AgentActivity({ caseId, refresh, navigate, openEvidence }: {
         let timer: ReturnType<typeof setTimeout>;
         async function poll() {
             try {
-                const result = await api(base + '/latest');
+                const result = await api(base + '/latest' + modeQuery);
                 if (active) { setRun(result); setLoaded(true); }
             } catch (failure) {
                 if (active) setError((failure as Error).message);
@@ -62,7 +66,7 @@ export function AgentActivity({ caseId, refresh, navigate, openEvidence }: {
         }
         void poll();
         return () => { active = false; clearTimeout(timer); };
-    }, [base, busy]);
+    }, [base, busy, modeQuery]);
 
     async function act(action: 'start' | 'resume' | 'cancel', task?: Task) {
         setBusy(true);
@@ -74,7 +78,7 @@ export function AgentActivity({ caseId, refresh, navigate, openEvidence }: {
                     body: JSON.stringify({ task_id: task.id, revision: run.current_revision, confirmed: true }),
                 });
             }
-            const path = action === 'start' ? base : `${base}/${run?.run_id}/${action}`;
+            const path = action === 'start' ? base + modeQuery : `${base}/${run?.run_id}/${action}`;
             setRun(await api(path, { method: 'POST' }));
             await refresh();
         } catch (failure) {
@@ -112,9 +116,9 @@ export function AgentActivity({ caseId, refresh, navigate, openEvidence }: {
     return <section className="card agent-panel" aria-labelledby="agent-heading">
         <div className="agent-head">
             <div><h2 id="agent-heading" className="paneltitle">Agent Activity</h2>
-                <p className="sub">{run?.objective || 'Prepare an evidence-backed pre-authorization draft for staff review.'}</p></div>
+                <p className="sub">{run?.objective || (mode === 'integrity' ? 'Review verified claim evidence and request administrative updates.' : 'Prepare an evidence-backed pre-authorization draft for staff review.')}</p></div>
             <div className="agent-actions">
-                {loaded && !active && <button className="btn primary" disabled={busy} onClick={() => act('start')}>{busy ? 'Working…' : 'Start preparation'}</button>}
+                {loaded && !active && <button className="btn primary" disabled={busy} onClick={() => act('start')}>{busy ? 'Working…' : mode === 'integrity' ? 'Start integrity review' : 'Start preparation'}</button>}
                 {active && <button className="btn small" disabled={busy} onClick={() => act('cancel')}>Cancel run</button>}
                 <button className="btn small" onClick={toggleQr}>{qrCode ? 'Hide case QR' : 'Show case QR'}</button>
             </div>
@@ -122,7 +126,7 @@ export function AgentActivity({ caseId, refresh, navigate, openEvidence }: {
         {qrCode && <div className="agent-qr"><img src={qrCode} width={220} height={220} alt="Scan this case from the signed-in PriorProof mobile app" /><p>Open Scan case QR in the signed-in mobile app.</p></div>}
         {error && <p role="alert" className="agent-error">{error}</p>}
         {run && <>
-            <p role="status"><strong>{({ waiting: 'Waiting for staff', running: 'Running', completed: 'Draft prepared', stopped: 'Stopped', cancelled: 'Cancelled' })[run.status] || run.status}</strong> · {run.current_task}</p>
+            <p role="status"><strong>{({ waiting: 'Waiting for staff', running: 'Running', completed: mode === 'integrity' ? 'Ready for staff review' : 'Draft prepared', stopped: 'Stopped', cancelled: 'Cancelled' })[run.status] || run.status}</strong> · {run.current_task}</p>
             {[...run.errors, ...run.warnings].map(message => <p key={message} className="notice">{message}</p>)}
             {run.interrupted && <div>
                 <h3 className="paneltitle">Staff tasks</h3>
@@ -130,7 +134,8 @@ export function AgentActivity({ caseId, refresh, navigate, openEvidence }: {
                     <div><strong>{task.subject}</strong><div className="muted">{labels[task.kind]}</div></div>
                     <div className="agent-actions">
                         {task.kind !== 'approve_draft' && <button className="btn small" onClick={() => {
-                            if (task.kind === 'missing_document') navigate('Documents', 'upload-documents');
+                            if (task.kind === 'integrity_review') navigate('Claim Integrity', 'lifecycle');
+                            else if (task.kind === 'missing_document') navigate('Documents', 'upload-documents');
                             else if (task.field_ids.length) navigate('Review & evidence', `field-${task.field_ids[0]}`);
                             else navigate('Review & evidence', 'staff-field');
                         }}>Open task</button>}

@@ -1,0 +1,18 @@
+[
+  {"name":"initial authorization aligned","estimate":7000000,"authorization":7000000,"expected":{"authorization_gap":0},"findings":[]},
+  {"name":"revised estimate exceeds authorization","estimate":11500000,"authorization":7000000,"expected":{"authorization_gap":4500000},"findings":["authorization-drift"]},
+  {"name":"verified enhancement supersedes earlier authorization","estimate":11500000,"authorization":7000000,"revised":9000000,"supersede":true,"expected":{"authorization_gap":2500000},"findings":["authorization-drift"]},
+  {"name":"verified threshold does not require an enhancement review","estimate":11500000,"authorization":9000000,"threshold":3000000,"expected":{"authorization_gap":2500000},"findings":[]},
+  {"name":"competing authorization records","estimate":11500000,"authorization":7000000,"revised":9000000,"expected":{"authorization_gap":null},"findings":["conflict-authorization"]},
+  {"name":"missing hospital agreement","bill":11500000,"expected":{"expected":null,"responsibility":null},"findings":["missing-agreement","responsibility-unknown"]},
+  {"name":"unrecognized reimbursement rule","bill":11500000,"terms":true,"unsupportedRule":true,"expected":{"expected":null,"responsibility":1000000},"findings":["contract-rule"]},
+  {"name":"explicit policy cap","bill":11500000,"terms":true,"policyCap":8250000,"expected":{"expected":8250000,"responsibility":1000000},"findings":[]},
+  {"name":"settlement reconciles exactly","bill":11500000,"terms":true,"settlement":9000000,"payment":9000000,"expected":{"expected":9000000,"received":9000000,"variance":null,"responsibility":1000000},"findings":[]},
+  {"name":"potential payment variance","bill":11500000,"terms":true,"settlement":8200000,"payment":8200000,"expected":{"variance":800000,"responsibility":1000000},"findings":["payment-variance"]},
+  {"name":"potential overpayment with paise","bill":11500000,"terms":true,"settlement":9100001,"payment":9100001,"expected":{"variance":-100001},"findings":["payment-variance"]},
+  {"name":"partial payment remains outstanding","bill":11500000,"terms":true,"settlement":8200000,"payment":8200000,"partial":true,"expected":{"outstanding":800000,"variance":null},"findings":["outstanding-payment"]},
+  {"name":"final advice exceeds confirmed receipts","bill":11500000,"terms":true,"settlement":9000000,"payment":8200000,"expected":{"outstanding":800000,"variance":null},"findings":["outstanding-payment","remittance-mismatch"]},
+  {"name":"settlement with no receipt yet","bill":11500000,"terms":true,"settlement":9000000,"expected":{"received":null,"variance":null},"findings":["missing-payment"]},
+  {"name":"payment reversal","bill":11500000,"terms":true,"settlement":9000000,"payment":9000000,"reversal":200005,"expected":{"received":8799995,"outstanding":200005},"findings":["outstanding-payment","remittance-mismatch"]},
+  {"name":"revised bill contradicts agreement","bill":11800000,"terms":true,"settlement":9000000,"payment":9000000,"expected":{"expected":null,"variance":null},"findings":["bill-inconsistent","responsibility-under-review"]}
+]

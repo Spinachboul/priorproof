@@ -7,11 +7,12 @@ import { casePath, runsPath, taskLabels, type AgentRun, type Task } from '../../
 import { Body, Button, Card, Heading, Input, Loading, Problem, Screen, Title, message } from '../../../src/ui';
 
 export default function Tasks() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, mode: requestedMode } = useLocalSearchParams<{ id: string; mode?: string }>();
+  const mode = requestedMode === 'integrity' ? 'integrity' : 'preauthorization';
   const { call } = useSession();
   const cache = useQueryClient();
   const record = useCase(id);
-  const agent = useAgent(id);
+  const agent = useAgent(id, mode);
   const run = agent.data;
   const base = runsPath(id) + '/' + run?.run_id;
   const [staffTask, setStaffTask] = useState<Task | null>(null);
@@ -31,7 +32,7 @@ export default function Tasks() {
       if (task) await call(base + '/input', json({ task_id: task.id, revision: run.current_revision, confirmed: true }));
       return call<AgentRun>(base + '/resume', { method: 'POST' });
     },
-    onSuccess: updated => cache.setQueryData(['agent', id], updated),
+    onSuccess: updated => cache.setQueryData(['agent', id, mode], updated),
     onSettled: refresh,
   });
 
@@ -47,7 +48,9 @@ export default function Tasks() {
   const blocked = record.data?.status === 'Processing' || agent.isError;
 
   function openTask(task: Task) {
-    if (task.kind === 'missing_document' || task.kind === 'missing_field') {
+    if (task.kind === 'integrity_review') {
+      router.push({ pathname: '/case/[id]/capture', params: { id, category: 'Financial claim evidence' } });
+    } else if (task.kind === 'missing_document' || task.kind === 'missing_field') {
       router.push({ pathname: '/case/[id]/capture', params: { id, category: task.kind === 'missing_document' ? task.subject : undefined } });
     } else if (task.field_ids.length) {
       router.push({ pathname: '/case/[id]/evidence', params: { id, fieldIds: task.field_ids.join(',') } });
@@ -58,12 +61,13 @@ export default function Tasks() {
   }
 
   return <Screen>
-    <Heading>Agent tasks</Heading>
+    <Heading>{mode === 'integrity' ? 'Financial review tasks' : 'Agent tasks'}</Heading>
+    {mode === 'integrity' && <Body>Upload supporting evidence here. Verify the document in the web workspace before confirming and resuming the review.</Body>}
     {agent.isPending && <Loading />}
     {agent.isError && <><Problem message={message(agent.error)} /><Button title="Retry" onPress={() => { void agent.refetch(); }} /></>}
     {agent.isSuccess && !run && <Body>Start preparation from Agent Activity on the website.</Body>}
     {run && <>
-      <Card><Title>{run.status === 'waiting' ? 'Waiting for staff' : run.status === 'completed' ? 'Draft prepared' : run.status}</Title>
+      <Card><Title>{run.status === 'waiting' ? 'Waiting for staff' : run.status === 'completed' ? (mode === 'integrity' ? 'Ready for staff review' : 'Draft prepared') : run.status}</Title>
         <Body>{run.current_task}</Body>
         {run.warnings.map(warning => <Body key={warning}>{warning}</Body>)}
         {run.errors.map(error => <Problem key={error} message={error} />)}
@@ -71,7 +75,7 @@ export default function Tasks() {
       {run.interrupted && run.tasks.map(task => <Card key={task.id}>
         <Title>{task.subject}</Title><Body>{taskLabels[task.kind]}</Body>
         {task.kind !== 'approve_draft' && <Button title={
-          task.kind === 'missing_document' || task.kind === 'missing_field' ? 'Capture supporting document' :
+          task.kind === 'missing_document' || task.kind === 'missing_field' || task.kind === 'integrity_review' ? 'Capture supporting document' :
             task.field_ids.length ? 'Open evidence' : 'Enter verified value'
         } secondary onPress={() => openTask(task)} disabled={busy} />}
         {task.kind === 'missing_field' && <Button title="Enter verified value" secondary disabled={busy} onPress={() => { setStaffTask(task); setValue(''); }} />}

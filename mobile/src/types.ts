@@ -16,7 +16,7 @@ export type CaseDetails = CaseSummary & {
 export type Source = { field: EvidenceField; filename: string; page: number | null; evidence: string };
 export type Task = {
   id: string;
-  kind: 'missing_document' | 'missing_field' | 'conflict' | 'verify_evidence' | 'approve_draft';
+  kind: 'missing_document' | 'missing_field' | 'conflict' | 'verify_evidence' | 'approve_draft' | 'integrity_review';
   subject: string;
   field_ids: string[];
 };
@@ -31,10 +31,11 @@ export const taskLabels: Record<Task['kind'], string> = {
   conflict: 'Resolve conflicting evidence',
   verify_evidence: 'Review source evidence',
   approve_draft: 'Approve PDF draft preparation',
+  integrity_review: 'Verify updated financial evidence before resuming',
 };
 export const categories = [
   'Admission notes', 'Clinical notes', 'Diagnostic reports', 'Treatment plans', 'Prescriptions',
-  'Cost estimates', 'Insurance policy', 'Insurance identification', 'Other supporting documents',
+  'Cost estimates', 'Insurance policy', 'Insurance identification', 'Other supporting documents', 'Financial claim evidence',
 ];
 export const casePath = (id: string) => '/api/cases/' + encodeURIComponent(id);
 export const runsPath = (id: string) => casePath(id) + '/agent/runs';

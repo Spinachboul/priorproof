@@ -1,0 +1,22 @@
+{
+  "id": "northstar-family",
+  "version": "demo-v1",
+  "name": "Northstar Health · Fictional family policy",
+  "payer": "Northstar Health",
+  "product": "Fictional family policy",
+  "policyVersion": "NS-SYNTH-2026-11",
+  "agreementReference": "Fictional Northstar agreement recorded in Aarav’s financial journey",
+  "source": "PriorProof synthetic payer profile and protected fictional agreement fixture",
+  "effectiveDate": "2026-11-26",
+  "expiryDate": null,
+  "enhancementThresholdPaise": 0,
+  "verification": "Verified synthetic fixture",
+  "workflowRequirements": [
+    {"stage": "Initial pre-authorization", "documents": ["Admission evidence", "Treatment estimate"], "fields": ["Effective date", "Estimated treatment cost"]},
+    {"stage": "Authorization enhancement", "documents": ["Revised treatment estimate", "Current authorization"], "fields": ["Effective date", "Estimated treatment cost", "Authorized amount"]},
+    {"stage": "Discharge authorization", "documents": ["Discharge authorization where supplied"], "fields": ["Effective date", "Authorized amount"]},
+    {"stage": "Final claim preparation", "documents": ["Current bill", "Applicable hospital-insurer agreement"], "fields": ["Gross billed amount", "Contractual adjustment", "Contractually allowable amount"]},
+    {"stage": "Clarification response", "documents": ["Settlement advice", "Payment confirmation"], "fields": ["Insurer settlement amount", "Confirmed payment"]},
+    {"stage": "Financial reconciliation", "documents": ["Applicable policy terms and latest remittance evidence"], "fields": ["Patient responsibility", "Verified reimbursement rule"]}
+  ]
+}

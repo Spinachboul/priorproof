@@ -153,6 +153,7 @@ export default function Capture() {
       await Promise.all([
         cache.invalidateQueries({ queryKey: ['case', id] }),
         cache.invalidateQueries({ queryKey: ['agent', id] }),
+        cache.invalidateQueries({ queryKey: ['integrity-summary', id] }),
         cache.invalidateQueries({ queryKey: ['cases'] }),
       ]);
     }

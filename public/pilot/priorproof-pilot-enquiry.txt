@@ -1,0 +1,22 @@
+PriorProof hospital desk pilot enquiry brief
+
+Purpose
+Evaluate whether evidence-linked preparation helps a hospital insurance desk complete cashless pre-authorization drafts with less staff time and acceptable review effort.
+
+Share this brief with the hospital staff member coordinating an internal pilot review. The site does not collect enquiries online. Please omit patient names, documents, identifiers and other case-level information.
+
+Discussion prompts
+- Hospital or desk type, workflow owner and approximate daily case volume.
+- Steps and tools used today for document collection, verification and request preparation.
+- Which handoffs or clarification loops the desk wants to measure.
+- Proposed pilot period, number of synthetic scenarios and staff reviewers.
+- Local inference hardware, internal approval, access roles, secure deployment and retention requirements.
+
+Suggested measurement
+- Compare manual and assisted time from intake to an approved draft. Include verification, corrections and sign-off in both runs.
+- Compare checklist completeness, evidence accuracy, missed conflicts, unsupported output and unresolved items.
+- Record rework and clarification counts separately. Track financial and insurer outcomes only if independently observable and properly authorized.
+- Record local inference, maintenance and staff costs separately from any estimated value of recovered capacity.
+
+Before live records
+The current prototype is for fictional records. A live workflow would require hospital approval, security and privacy assessment, an appropriate legal basis and notices, organization-level roles, secure infrastructure, and a defined retention and incident-response process. Insurers retain all authorization decisions.

@@ -5,9 +5,9 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api } from './client-api';
 
 const NOTICE = 'PP-NOTICE-2026-11-v1';
-const purposeOptions = { preauthorization: 'Prepare a pre-authorization draft', 'workflow-training': 'Fictional workflow training' };
+const purposeOptions = { preauthorization: 'Prepare a pre-authorization draft', 'workflow-training': 'Fictional workflow training', 'claim-integrity': 'Review fictional financial claim records' };
 const categoryOptions = { 'patient-identification': 'Patient and admission identifiers', 'clinical-records': 'Clinical records',
-    insurance: 'Insurance details', 'cost-estimates': 'Cost estimates' };
+    insurance: 'Insurance details', 'cost-estimates': 'Cost estimates', 'financial-claim-records': 'Financial claim records' };
 const recipientOptions = { 'hospital-desk': 'Hospital desk', 'authorized-reviewers': 'Authorized reviewers',
     'insurer-or-tpa': 'Intended insurer or TPA recipient' };
 const basisOptions = { 'synthetic-demonstration': 'Synthetic demonstration', 'consent-recorded-externally': 'Consent reported as recorded elsewhere',

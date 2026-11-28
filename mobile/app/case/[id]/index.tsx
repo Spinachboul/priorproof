@@ -34,6 +34,7 @@ export default function Details() {
       {item.conflicts.map(conflict => <Body key={conflict.field}>{conflict.field} · {conflict.values.map(value => value.value).join(' / ')}</Body>)}
       <Button title="Review evidence" secondary onPress={() => router.push({ pathname: '/case/[id]/evidence', params: { id } })} />
     </Card>
+    <Button title="Financial summary" secondary onPress={() => router.push({ pathname: '/case/[id]/financial', params: { id } })} />
     <Button title="Draft packet" secondary onPress={() => router.push({ pathname: '/case/[id]/packet', params: { id } })} />
   </Screen>;
 }

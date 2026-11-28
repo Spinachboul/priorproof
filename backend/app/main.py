@@ -50,7 +50,7 @@ MAX_PAGES = 40
 MAX_PIXELS = 20_000_000
 PDF_PAGE_DATA_PREFIX = "\x1e"
 MAX_BYTES = int(os.getenv("MAX_UPLOAD_MB", "15")) * 1024 * 1024
-UPLOAD_CATEGORIES = {"Admission notes", "Clinical notes", "Diagnostic reports", "Treatment plans", "Prescriptions", "Cost estimates", "Insurance policy", "Insurance identification", "Other supporting documents"}
+UPLOAD_CATEGORIES = {"Admission notes", "Clinical notes", "Diagnostic reports", "Treatment plans", "Prescriptions", "Cost estimates", "Insurance policy", "Insurance identification", "Other supporting documents", "Financial claim evidence"}
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("priorproof")
 # Access logs can include arbitrary paths and query strings. Use metadata-only audit events.
@@ -152,6 +152,7 @@ def init_db():
         )
         c.executescript(audit.SCHEMA)
         c.executescript(privacy.SCHEMA)
+        c.executescript(claim_integrity.SCHEMA)
         c.execute("""create table if not exists document_uploads(
             case_id TEXT NOT NULL, upload_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
             result TEXT NOT NULL, primary key(case_id, upload_id))""")
@@ -1697,6 +1698,9 @@ def delete_case_data(cid: str):
             for table in ("document_uploads", "unsupported_proposals", "fields", "documents", "audit_events",
                           "privacy_requests", "document_privacy_reviews", "case_privacy"):
                 c.execute(f"delete from {table} where case_id=?", (cid,))
+            for table in ("integrity_events", "integrity_reviews", "integrity_demo_cases", "integrity_outcomes",
+                          "integrity_profile_versions", "integrity_profile_pins", "integrity_payment_investigations"):
+                c.execute(f"delete from {table} where case_id=?", (cid,))
             agent.delete_runs(c, cid)
             c.execute("delete from cases where id=?", (cid,))
             audit.record(c, "case.deleted", case_id=cid, object_id=cid)
@@ -1708,7 +1712,8 @@ def delete_case_data(cid: str):
     return {"deleted": True, "cleanupPending": pending}
 
 
-from . import agent
+from . import agent, claim_integrity
 
 app.include_router(agent.router)
+app.include_router(claim_integrity.router)
 app.include_router(privacy.router)

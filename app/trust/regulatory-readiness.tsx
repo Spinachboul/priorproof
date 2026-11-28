@@ -5,7 +5,7 @@ const notices = 'https://www.meity.gov.in/documents/act-and-policies/digital-per
 
 const controls = [
     ['Act §5 · Rules r.3', 'Make the purpose, categories and rights channels understandable.',
-        'Partially implemented', 'Versioned demo notice and case creation confirmation.',
+        'Partially implemented', 'Versioned demo notice, case creation confirmation and a financial claim records processing category.',
         'The hospital must provide its own notice, appropriate language choices and usable rights channels.'],
     ['Act §6', 'Record and manage consent where applicable.',
         'Requires organizational or legal action', 'Case records distinguish a staff confirmation from consent reported elsewhere.',
@@ -14,7 +14,7 @@ const controls = [
         'Requires organizational or legal action', 'A staff-selected basis is recorded with an actor and timestamp.',
         'The prototype cannot decide whether statutory conditions apply.'],
     ['Act §8 · Rules r.6', 'Protect personal data and make access reviewable.',
-        'Partially implemented', 'Tests cover masking, cross-case authorization, original preservation and metadata-only audit.',
+        'Partially implemented', 'Case-scoped original access, masked payment references, revision-bound reporting and metadata-only audit support staff review.',
         'Individual identity, role permissions, encryption, monitoring, backup and applicable log retention require deployment controls.'],
     ['Act §11', 'Support access to information about personal data processing.',
         'Partially implemented', 'Processing summary export and access request record.',
@@ -52,8 +52,8 @@ export function PrivacyNotice() {
         <div className="public-panel">
             <h2>Patient Privacy</h2>
             <p><strong>Notice PP-NOTICE-2026-11-v1</strong> · Fictional demonstration</p>
-            <p>PriorProof collects case details, supporting documents and staff decisions to prepare an evidence-linked pre-authorization draft. The backend stores originals, extracted text and case metadata on the device hosting the API. Local extraction and optional loopback Ollama processing support staff review. A browser or phone sends records to the configured backend.</p>
-            <p>Signed-in demo staff can review, export and delete cases available to the shared account. No insurer submission takes place in this demo. Retention review dates and holds are recorded per case. Staff decide when deletion may proceed. Downloaded copies and backups require separate handling.</p>
+            <p>PriorProof collects case details, supporting documents and staff decisions to prepare an evidence-linked pre-authorization draft and, when authorized in the case, review authorization, billing and payment evidence. The backend stores originals, extracted text and case metadata on the device hosting the API. Local extraction and optional loopback Ollama processing support staff review. A browser or phone sends records to the configured backend.</p>
+            <p>Signed-in demo staff can review, export and delete cases available to the shared account. No insurer submission takes place in this demo. Retention review dates and holds are recorded per case. Staff decide when deletion may proceed. Financial PDFs use the current staff-reviewed revision. The patient summary omits the patient name, payment references and contractual excerpts. Downloaded copies and backups require separate handling.</p>
             <p>Contact the person running this demo to raise a privacy question. Signed-in staff can record an access, correction, erasure or grievance request in the case privacy panel. Staff confirmation records an administrative action. Patient consent requires separate evidence where applicable.</p>
         </div>
     </section>;

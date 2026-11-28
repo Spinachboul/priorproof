@@ -1,4 +1,4 @@
-"""Bounded pre-authorization preparation with local, durable LangGraph state."""
+"""Bounded claim preparation and financial integrity review with local, durable LangGraph state."""
 
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
@@ -21,14 +21,17 @@ import requests
 
 router = APIRouter(prefix="/api/cases/{cid}/agent")
 OBJECTIVE = "Prepare an evidence-backed pre-authorization draft for staff review."
+INTEGRITY_OBJECTIVE = "Review verified claim evidence and request administrative updates."
+RunMode = Literal["preauthorization", "integrity"]
 MAX_ITERATIONS = 36
 MAX_SECONDS = 45
 TERMINAL = {"completed", "stopped", "cancelled"}
 LOCKS = tuple(RLock() for _ in range(64))
 
 Tool = Literal["inspect_case", "extract_document", "verify_evidence", "check_requirements",
-               "detect_conflicts", "evaluate_readiness", "request_human_input", "generate_draft_packet"]
-TaskKind = Literal["missing_document", "missing_field", "conflict", "verify_evidence", "approve_draft"]
+               "detect_conflicts", "evaluate_readiness", "request_human_input", "generate_draft_packet",
+               "inspect_claim_lifecycle", "reconcile_financial_state", "prepare_integrity_report"]
+TaskKind = Literal["missing_document", "missing_field", "conflict", "verify_evidence", "approve_draft", "integrity_review"]
 
 
 class StrictModel(BaseModel):
@@ -91,6 +94,7 @@ class TaskChoice(StrictModel):
 
 
 class State(TypedDict, total=False):
+    mode: RunMode
     run_id: str
     case_id: str
     user_scope: str
@@ -148,6 +152,8 @@ def setup():
                 PRIMARY KEY (run_id, revision)
             );
         """)
+        if "mode" not in {column["name"] for column in connection.execute("pragma table_info(agent_runs)")}:
+            connection.execute("alter table agent_runs add column mode TEXT NOT NULL DEFAULT 'preauthorization'")
         SqliteSaver(connection).setup()
 
 
@@ -158,14 +164,14 @@ def delete_runs(connection, cid):
     connection.execute("delete from agent_runs where case_id=?", (cid,))
 
 
-def run_row(cid, run_id=None):
+def run_row(cid, run_id=None, mode=None):
     with closing(service.conn()) as connection, connection:
         connection.execute("BEGIN")
         case = service.getcase(cid, connection)
         return connection.execute(
             """select * from agent_runs where case_id=? and owner_id=? and (? is null or id=?)
-               order by created_at desc limit 1""",
-            (cid, case["owner_id"], run_id, run_id),
+               and (? is null or mode=?) order by created_at desc limit 1""",
+            (cid, case["owner_id"], run_id, run_id, mode, mode),
         ).fetchone()
 
 
@@ -186,6 +192,8 @@ def snapshot(params, state, *, detail=True):
             raise StopRun("Case changed during execution. Start a new run to reconcile the current case.")
         if not detail:
             return
+        if state.get("mode") == "integrity":
+            return service.claim_integrity.snapshot(connection, case)
         case_detail = service.case_snapshot(case, connection)
         case_detail["agentNeedsExtraction"] = processing_needed(case_detail) or changes_need_analysis(connection, params.case_id)
         return case_detail
@@ -265,7 +273,29 @@ def evaluate_readiness(params, case):
                       score=readiness["score"], tasks=readiness_tasks(case), warnings=warnings)
 
 
+def inspect_claim_lifecycle(params, case):
+    return ToolOutput(summary=f"Inspected {len(case['events'])} lifecycle events using the active verification profile.")
+
+
+def reconcile_financial_state(params, case):
+    findings = case["findings"]
+    if not case["events"]:
+        tasks = [HumanTask(id="integrity:admission", kind="integrity_review", subject="Record admission evidence")]
+    else:
+        tasks = [HumanTask(id="integrity:" + item["id"], kind="integrity_review", subject=item["category"])
+                 for item in sorted(findings, key=lambda item: item["priority"] != "High")[:8]]
+        if not tasks and "received" not in case["amounts"]:
+            tasks = [HumanTask(id="integrity:next-stage", kind="integrity_review", subject="Record evidence for the next lifecycle stage")]
+    return ToolOutput(summary=f"Reconciled verified amounts and identified {len(findings)} open findings.", tasks=tasks)
+
+
+def prepare_integrity_report(params, case):
+    return ToolOutput(summary="The current evidence is ready for staff report review.")
+
+
 READ_TOOLS = {
+    "inspect_claim_lifecycle": inspect_claim_lifecycle, "reconcile_financial_state": reconcile_financial_state,
+    "prepare_integrity_report": prepare_integrity_report,
     "inspect_case": inspect_case, "check_requirements": check_requirements,
     "detect_conflicts": detect_conflicts, "verify_evidence": verify_evidence,
     "evaluate_readiness": evaluate_readiness,
@@ -274,6 +304,7 @@ FLOW = {
     "inspect_case": "check_requirements", "check_requirements": "assess",
     "extract_document": "inspect_case", "detect_conflicts": "verify_evidence",
     "verify_evidence": "evaluate_readiness",
+    "inspect_claim_lifecycle": "reconcile_financial_state",
 }
 
 
@@ -341,7 +372,7 @@ def choose_task(tasks, context):
 
 def request_human_input(params, state, context):
     tasks = [HumanTask.model_validate(task) for task in state["tasks"]]
-    priority, mode = choose_task(tasks, context)
+    priority, mode = (tasks[0], "deterministic rules") if state.get("mode") == "integrity" else choose_task(tasks, context)
     return ToolOutput(summary="Requested staff input about " + priority.subject + ".",
                       tasks=[priority, *[task for task in tasks if task != priority]]), mode
 
@@ -428,6 +459,8 @@ def execute(state: State, runtime: Runtime[RunContext]):
                   }])
     if tool in FLOW:
         update["phase"] = FLOW[tool]
+    elif tool == "reconcile_financial_state":
+        update["phase"] = "request_human_input" if update["tasks"] else "prepare_integrity_report"
     elif tool == "evaluate_readiness":
         update["phase"] = "resolve"
         if not update["tasks"] and state.get("approval_revision") != params.revision:
@@ -453,7 +486,8 @@ def wait_for_staff(state: State):
         return {"status": "running", "tasks": [], "approval_revision": response.revision,
                 "phase": "resolve", "current_task": "Preparing the approved PDF draft."}
     return {"status": "running", "tasks": [], "revision": response.revision,
-            "phase": "inspect_case", "current_task": "Rechecking the updated case."}
+            "phase": "inspect_claim_lifecycle" if state.get("mode") == "integrity" else "inspect_case",
+            "current_task": "Rechecking the updated case."}
 
 
 def route_step(state):
@@ -484,9 +518,11 @@ def graph_session():
 
 
 def initial(row):
-    return State(run_id=row["id"], case_id=row["case_id"], user_scope=row["owner_id"], revision=row["revision"],
+    mode = row["mode"]
+    return State(mode=mode, run_id=row["id"], case_id=row["case_id"], user_scope=row["owner_id"], revision=row["revision"],
                  documents=[], evidence=[], missing=[], conflicts=[], tasks=[], history=[], errors=[], warnings=[],
-                 current_task="Inspecting the case.", status="running", iterations=0, phase="inspect_case", seen=[])
+                 current_task="Inspecting the case.", status="running", iterations=0,
+                 phase="inspect_claim_lifecycle" if mode == "integrity" else "inspect_case", seen=[])
 
 
 def public_run(row, graph):
@@ -496,7 +532,7 @@ def public_run(row, graph):
     for key in ("seen", "phase", "user_scope", "approval_revision", "needs_extraction"):
         response.pop(key, None)
     case = service.getcase(row["case_id"])
-    response.update(objective=OBJECTIVE, current_revision=case["updated_at"],
+    response.update(objective=INTEGRITY_OBJECTIVE if row["mode"] == "integrity" else OBJECTIVE, current_revision=case["updated_at"],
                     input_received=bool(row["human_input"]), interrupted=bool(checkpoint.interrupts))
     if state["status"] == "waiting" and case["updated_at"] != state["revision"]:
         warning = ("Draft approval expired after a case change. Cancel this run and start preparation again."
@@ -531,9 +567,9 @@ def mutation(cid):
 
 
 @router.post("/runs")
-def start(cid: str):
+def start(cid: str, mode: RunMode = "preauthorization"):
     with mutation(cid), graph_session() as graph:
-        last = run_row(cid)
+        last = run_row(cid, mode=mode)
         if last is not None:
             current = public_run(last, graph)
             if current["status"] not in TERMINAL:
@@ -544,8 +580,8 @@ def start(cid: str):
             if case["status"] == "Processing":
                 raise HTTPException(409, "Wait for document processing to finish")
             run_id = str(uuid4())
-            connection.execute("insert into agent_runs (id,case_id,owner_id,revision,created_at) values (?,?,?,?,?)",
-                               (run_id, cid, case["owner_id"], case["updated_at"], service.now()))
+            connection.execute("insert into agent_runs (id,case_id,owner_id,revision,created_at,mode) values (?,?,?,?,?,?)",
+                               (run_id, cid, case["owner_id"], case["updated_at"], service.now(), mode))
             service.audit.record(connection, "agent.started", case_id=cid, object_id=run_id)
         row = require_run(cid, run_id)
         advance(row, graph, initial(row))
@@ -553,8 +589,8 @@ def start(cid: str):
 
 
 @router.get("/runs/latest")
-def latest(cid: str):
-    row = run_row(cid)
+def latest(cid: str, mode: RunMode = "preauthorization"):
+    row = run_row(cid, mode=mode)
     with graph_session() as graph:
         return public_run(row, graph) if row is not None else None
 
@@ -575,7 +611,7 @@ def tasks(cid: str, run_id: str):
     return status(cid, run_id)["tasks"]
 
 
-def validate_input(body, current, case):
+def validate_input(body, current, case, connection=None):
     task = next((task for task in current["tasks"] if task["id"] == body.task_id), None)
     if task is None or body.revision != case["updatedAt"] or case["status"] == "Processing":
         raise HTTPException(409, "Refresh the case and confirm a current requested task")
@@ -585,6 +621,16 @@ def validate_input(body, current, case):
         raise HTTPException(409, "Case revision or readiness changed. Cancel this run and start a new one")
     if body.revision == current["revision"]:
         raise HTTPException(409, "Complete the requested case update first")
+    if task["kind"] == "integrity_review":
+        if connection is None:
+            with closing(service.conn()) as read, read:
+                read.execute("BEGIN")
+                latest = service.getcase(case["id"], read)
+                return validate_input(body, current, service.case_json(latest), read)
+        if connection.execute("select 1 from integrity_events where case_id=? and case_revision>?",
+                              (case["id"], current["revision"])).fetchone():
+            return
+        raise HTTPException(409, "Record new verified integrity evidence before confirming this task")
     if task["kind"] == "missing_document":
         if any(d["category"] == task["subject"] and d["id"] not in {old["id"] for old in current["documents"]}
                for d in case["documents"]):
@@ -607,7 +653,8 @@ def provide_input(cid: str, run_id: str, body: HumanInput):
         with closing(service.conn()) as connection, connection:
             connection.execute("BEGIN IMMEDIATE")
             case = service.getcase(cid, connection)
-            validate_input(body, current, service.case_snapshot(case, connection))
+            validate_input(body, current, service.case_json(case) if row["mode"] == "integrity"
+                           else service.case_snapshot(case, connection), connection)
             if row["human_input"] != body.model_dump_json():
                 connection.execute("update agent_runs set human_input=? where id=? and cancelled=0",
                                    (body.model_dump_json(), run_id))
@@ -626,7 +673,8 @@ def resume(cid: str, run_id: str):
             if not row["human_input"]:
                 raise HTTPException(409, "Confirm a completed task before resuming")
             body = HumanInput.model_validate_json(row["human_input"])
-            validate_input(body, current, service.case_detail(cid))
+            validate_input(body, current, service.case_json(service.getcase(cid)) if row["mode"] == "integrity"
+                           else service.case_detail(cid))
             value = Command(resume=body.model_dump())
         else:
             value = None if graph.get_state(config(run_id)).values else initial(row)

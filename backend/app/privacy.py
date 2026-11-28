@@ -58,8 +58,8 @@ class Input(BaseModel):
 
 
 class AuthorizationIn(Input):
-    purpose: Literal["preauthorization", "workflow-training"]
-    categories: list[Literal["patient-identification", "clinical-records", "insurance", "cost-estimates"]] = Field(min_length=1, max_length=4)
+    purpose: Literal["preauthorization", "workflow-training", "claim-integrity"]
+    categories: list[Literal["patient-identification", "clinical-records", "insurance", "cost-estimates", "financial-claim-records"]] = Field(min_length=1, max_length=5)
     recipients: list[Literal["hospital-desk", "authorized-reviewers", "insurer-or-tpa"]] = Field(min_length=1, max_length=3)
     basis: Literal["synthetic-demonstration", "consent-recorded-externally", "certain-legitimate-use", "pending-review"]
     noticeVersion: Literal["PP-NOTICE-2026-11-v1"]
@@ -222,8 +222,15 @@ def get_privacy(cid: str):
 def record_authorization(cid: str, body: AuthorizationIn):
     with closing(service.conn()) as c, c:
         c.execute("BEGIN IMMEDIATE")
-        service.getcase(cid, c)
+        case = service.getcase(cid, c)
+        previous = case_record(c, cid)
+        authorization = json.loads(previous["authorization"] or "{}") if previous else {}
+        financial = "financial-claim-records" in authorization.get("categories", []) or "financial-claim-records" in body.categories
+        if financial and case["status"] == "Processing":
+            raise HTTPException(409, "Wait for document processing to finish before updating financial authorization.")
         save_authorization(c, cid, body)
+        if financial:
+            c.execute("update cases set updated_at=? where id=?", (service.now(), cid))
     return get_privacy(cid)
 
 

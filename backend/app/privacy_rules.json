@@ -5,6 +5,7 @@
     "Telephone": "Requires staff review",
     "Email": "Requires staff review",
     "Bank account": "Potentially unnecessary",
+    "Payment reference": "Requires staff review",
     "Passport": "Requires staff review",
     "Membership ID": "Requires staff review"
   },
@@ -13,6 +14,7 @@
   },
   "customIdentifiers": [
     {"category": "Passport", "pattern": "(?im)\\bpassport(?:[ \\t]*(?:number|no\\.?))?[ \\t]*[:#=-][ \\t]*(?P<value>[A-Z][0-9]{7})\\b"},
-    {"category": "Membership ID", "pattern": "(?im)\\bmembership(?:[ \\t]*(?:number|ID|reference))?[ \\t]*[:#=-][ \\t]*(?P<value>[A-Z0-9][A-Z0-9-]{5,31})\\b"}
+    {"category": "Membership ID", "pattern": "(?im)\\bmembership(?:[ \\t]*(?:number|ID|reference))?[ \\t]*[:#=-][ \\t]*(?P<value>[A-Z0-9][A-Z0-9-]{5,31})\\b"},
+    {"category": "Payment reference", "pattern": "(?im)\\b(?:transaction|payment|remittance)[ \\t]+reference[ \\t]*[:#=-][ \\t]*(?P<value>[A-Z0-9][A-Z0-9._/-]{4,79})"}
   ]
 }

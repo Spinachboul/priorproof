@@ -3,7 +3,7 @@ import TrustControls from './trust-controls';
 import { PrivacyNotice, RegulatoryReadiness } from './regulatory-readiness';
 
 export default function TrustPage() {
-    return <PublicShell>
+    return <PublicShell active="/trust">
         <section className="public-section page-intro">
             <p className="public-overline">Privacy and staff accountability</p>
             <h1>Trust Centre</h1>
