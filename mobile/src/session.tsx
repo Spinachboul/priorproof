@@ -4,11 +4,10 @@ import * as SecureStore from 'expo-secure-store';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 const storageKey = 'priorproof.session';
-export const savedKeyName = 'priorproof.demo-login';
 export type Session = { server: string; token: string };
 type SessionContext = {
   session: Session | null; loading: boolean; lastServer: string;
-  login: (server: string, key: string, remember: boolean) => Promise<void>;
+  loginDemo: (server: string) => Promise<void>;
   signOut: () => Promise<void>;
   call: <T>(path: string, init?: RequestInit) => Promise<T>;
 };
@@ -17,7 +16,7 @@ const Context = createContext<SessionContext | null>(null);
 
 export function serverOrigin(value: string) {
   let url: URL;
-  try { url = new URL(value.trim()); } catch { throw new Error('Enter a complete server URL, such as http://192.168.1.20:8000.'); }
+  try { url = new URL(value.trim()); } catch { throw new Error('Enter a complete server URL, such as http://192.168.1.20:8001.'); }
   if (url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
     throw new Error('Use the server origin without a path, credentials or query.');
   }
@@ -53,7 +52,7 @@ async function request<T>(server: string, path: string, init?: RequestInit, toke
     return body as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new Error('Could not reach PriorProof. Check the server address and network connection.');
+    throw new Error(`Could not reach PriorProof at ${server}. Open ${server}/api/health in your phone’s browser to check the connection.`);
   } finally {
     clearTimeout(timer);
   }
@@ -86,11 +85,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
-  async function login(serverValue: string, key: string, remember: boolean) {
+  async function loginDemo(serverValue: string) {
     const server = serverOrigin(serverValue);
-    const result = await request<{ token: string }>(server, '/api/auth/login', json({ accessKey: key }));
+    const result = await request<{ token: string }>(server, '/api/auth/login', json({ userId: 'user1', password: 'abc123' }));
     if (!result?.token) throw new Error('This server did not return a PriorProof session.');
-    if (remember) await SecureStore.setItemAsync(savedKeyName, JSON.stringify({ server, key }));
     const next = { server, token: result.token };
     await SecureStore.setItemAsync(storageKey, JSON.stringify(next));
     queryClient.clear();
@@ -110,7 +108,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [signOut]);
 
-  return <Context.Provider value={{ session, lastServer, loading, login, signOut, call }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ session, lastServer, loading, signOut, call, loginDemo }}>{children}</Context.Provider>;
 }
 
 export function useSession() {

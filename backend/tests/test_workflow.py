@@ -89,6 +89,18 @@ class WorkflowTests(unittest.TestCase):
             expired = self.anonymous.post("/api/auth/login", json={"accessKey": "test-demo-key"}).json()["token"]
         self.assertEqual(self.anonymous.get("/api/cases", headers={"Authorization": f"Bearer {expired}"}).status_code, 401)
 
+    def test_fictional_demo_credentials_require_opt_in(self):
+        credentials = {"userId": "user1", "password": "abc123"}
+        with patch.dict(os.environ, {"DEMO_LOGIN_ENABLED": "0", "DEMO_ACCESS_KEY": ""}):
+            self.assertEqual(self.anonymous.post("/api/auth/login", json=credentials).status_code, 403)
+        with patch.dict(os.environ, {"DEMO_LOGIN_ENABLED": "1", "DEMO_ACCESS_KEY": ""}):
+            invalid = self.anonymous.post("/api/auth/login", json={**credentials, "userId": "other"})
+            self.assertEqual(invalid.status_code, 401)
+            signed_in = self.anonymous.post("/api/auth/login", json=credentials)
+            self.assertEqual(signed_in.status_code, 200)
+            headers = {"Authorization": "Bearer " + signed_in.json()["token"]}
+            self.assertEqual(self.anonymous.get("/api/cases", headers=headers).status_code, 200)
+
     def test_cors_does_not_grant_case_access(self):
         origin = "http://192.168.0.10:3000"
         headers = {"Origin": origin, "Access-Control-Request-Method": "GET",

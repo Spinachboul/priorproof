@@ -85,7 +85,7 @@ LAN_IP=192.168.29.30
 export DEMO_ACCESS_KEY="$(openssl rand -hex 24)"
 printf 'PriorProof demo key %s\n' "$DEMO_ACCESS_KEY"
 DATABASE_PATH=./data/phase3-demo.db UPLOAD_DIR=./data/phase3-uploads \
-  AI_PROVIDER=mock AGENT_PLANNER=disabled \
+  AI_PROVIDER=mock AGENT_PLANNER=disabled DEMO_LOGIN_ENABLED=1 \
   CORS_ORIGINS="http://$LAN_IP:3000" \
   .venv/bin/python -m uvicorn app.main:app --host "$LAN_IP" --port 8000
 ```
@@ -105,7 +105,7 @@ npx expo start --go --lan
 
 Replace the example IP in both terminals with the laptop's private Wi-Fi IP. Open the Expo development QR with Expo Go (or the system camera on iOS), then enter `http://192.168.29.30:8000` and the access key in PriorProof. This development QR opens the app. The case QR displayed on the website opens a specific case after sign-in and owner verification. It contains only the opaque case UUID.
 
-On a trusted demo device, enable **Remember demo key on this device** when signing in to prefill the server and key next time. Turn the switch off on the sign-in screen to remove the saved key.
+With `DEMO_LOGIN_ENABLED=1` and fictional storage, select **Sign in as demo user** in the mobile app. It submits `user1` and `abc123` and receives a normal session. The mobile app suggests Metro’s LAN address on port 8001 for a standalone demo backend. Enter port 8000 when following the combined web and mobile setup above, or set `EXPO_PUBLIC_API_URL` when starting Metro to prefill that URL. The website uses the configured access key.
 
 LAN HTTP transmits the demo key, bearer sessions and records without encryption. Use only fictional records on trusted Wi-Fi. Real deployments require HTTPS and an appropriate staff identity and access model. The existing demo uses one shared account and one backend worker. Any staff using that account share its case access. Mobile stores the session in SecureStore and keeps case data in memory. Upload and PDF export cache copies are removed after use during normal navigation. Files saved or sent through the system share sheet are managed by the receiving app. For a native build outside Expo Go, use HTTPS, or configure platform-specific private LAN transport for a fictional demo.
 

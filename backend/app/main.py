@@ -646,19 +646,27 @@ def startup():
 
 @app.post("/api/auth/login")
 def login(body: dict[str, str]):
+    demo_login = "userId" in body or "password" in body
     configured_key = os.getenv("DEMO_ACCESS_KEY", "")
-    if not configured_key or configured_key == "replace-with-a-long-random-local-key":
+    if demo_login and os.getenv("DEMO_LOGIN_ENABLED") != "1":
+        raise HTTPException(403, "Demo credentials are disabled on this server")
+    if not demo_login and (not configured_key or configured_key == "replace-with-a-long-random-local-key"):
         raise HTTPException(503, "Set a private DEMO_ACCESS_KEY in backend/.env before signing in")
-    supplied = body.get("accessKey", "")
     with _login_lock:
         cutoff = time.monotonic() - 60
         while _failed_logins and _failed_logins[0] <= cutoff:
             _failed_logins.popleft()
         if len(_failed_logins) >= 12:
             raise HTTPException(429, "Too many sign-in attempts. Try again in a minute.")
-        if not hmac.compare_digest(supplied.encode(), configured_key.encode()):
+        if demo_login:
+            valid_user = hmac.compare_digest(body.get("userId", "").encode(), b"user1")
+            valid_password = hmac.compare_digest(body.get("password", "").encode(), b"abc123")
+            valid = valid_user and valid_password
+        else:
+            valid = hmac.compare_digest(body.get("accessKey", "").encode(), configured_key.encode())
+        if not valid:
             _failed_logins.append(time.monotonic())
-            raise HTTPException(401, "Access key is incorrect")
+            raise HTTPException(401, "Demo credentials are incorrect" if demo_login else "Access key is incorrect")
     token = issue_token()
     marker = audit.session_id.set(token.split(":")[2])
     try:
