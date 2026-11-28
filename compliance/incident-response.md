@@ -3,3 +3,5 @@
 For unauthorized access, accidental real-record upload, unexpected extraction or suspected leakage, stop exposing the demo. Restart the API with a rotated key to invalidate active bearer sessions. Avoid copying record text into diagnostic logs or incident messages.
 
 Record the time, affected case IDs, activity event IDs and observed outcome. Review API and filesystem exposure, Wi-Fi access, local reports and backups. Remove unintended records and exports where the operator has authority to do so. If a deployment handles real information, use the organization's approved incident and notification process before restoring access.
+
+The Trust Centre count reflects recorded denied access and failed sign-in events. Anonymous denial logging is capped to prevent log flooding. Counts are observations rather than breach determinations. For a real deployment, designate an incident owner, establish evidence preservation and approved notification channels, and apply the applicable notification requirements. Rule 7 notifications to affected Data Principals and the Board require an organizational assessment and response. PriorProof does not send breach notifications.

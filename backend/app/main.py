@@ -5,7 +5,7 @@ import unicodedata
 from collections import deque
 from decimal import Decimal
 from .readiness import REQUIRED, build_readiness
-from . import audit
+from . import audit, privacy
 from contextlib import closing
 from io import BytesIO
 from threading import Lock
@@ -53,6 +53,8 @@ MAX_BYTES = int(os.getenv("MAX_UPLOAD_MB", "15")) * 1024 * 1024
 UPLOAD_CATEGORIES = {"Admission notes", "Clinical notes", "Diagnostic reports", "Treatment plans", "Prescriptions", "Cost estimates", "Insurance policy", "Insurance identification", "Other supporting documents"}
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("priorproof")
+# Access logs can include arbitrary paths and query strings. Use metadata-only audit events.
+logging.getLogger("uvicorn.access").disabled = True
 app = FastAPI(title="PriorProof API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
 
 # One shared demo account. Configure DEMO_ACCESS_KEY before exposing the app to
@@ -64,6 +66,8 @@ _login_lock = Lock()
 _demo_lock = Lock()
 _pdf_extract_lock = Lock()
 _failed_logins = deque()
+_denial_lock = Lock()
+_anonymous_denials = deque()
 PUBLIC_ROUTES = {("POST", "/api/auth/login"), ("GET", "/api/health")}
 
 
@@ -93,6 +97,7 @@ async def require_demo_auth(request: Request, call_next):
         authorization = request.headers.get("authorization", "")
         token = authorization[7:] if authorization.lower().startswith("bearer ") else None
         if not authenticate_token(token):
+            await run_in_threadpool(record_anonymous_denial, "access.denied", "http-401")
             return JSONResponse(status_code=401, content={"detail": "Sign in to access PriorProof"})
         if request.method == "POST" and re.fullmatch(r"/api/cases/[^/]+/documents", request.url.path):
             length = request.headers.get("content-length", "")
@@ -105,7 +110,7 @@ async def require_demo_auth(request: Request, call_next):
         response = await call_next(request)
         if marker is not None and response.status_code in {403, 404, 409}:
             match = re.fullmatch(r"/api/cases/([0-9a-f-]{36})(?:/.*)?", request.url.path)
-            if match and request.method in {"PUT", "POST", "DELETE"}:
+            if match:
                 await run_in_threadpool(record_case_denial, match[1], request.method, response.status_code)
     finally:
         if marker is not None:
@@ -146,6 +151,7 @@ def init_db():
   CREATE TABLE IF NOT EXISTS fields(id TEXT PRIMARY KEY,case_id TEXT NOT NULL,group_name TEXT NOT NULL,name TEXT NOT NULL,value TEXT,original TEXT,source_doc TEXT,source_name TEXT,page INTEGER,evidence TEXT,confidence REAL,review TEXT NOT NULL,origin TEXT NOT NULL DEFAULT 'AI-extracted');"""
         )
         c.executescript(audit.SCHEMA)
+        c.executescript(privacy.SCHEMA)
         c.execute("""create table if not exists document_uploads(
             case_id TEXT NOT NULL, upload_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
             result TEXT NOT NULL, primary key(case_id, upload_id))""")
@@ -164,10 +170,25 @@ def init_db():
             c.execute("alter table cases add column review_notes TEXT")
 
 
+def record_anonymous_denial(action, outcome):
+    with _denial_lock:
+        current = time.monotonic()
+        while _anonymous_denials and _anonymous_denials[0] <= current - 60:
+            _anonymous_denials.popleft()
+        if len(_anonymous_denials) >= 30:
+            return
+        _anonymous_denials.append(current)
+    with closing(conn()) as c, c:
+        audit.record(c, action, outcome=outcome, actor="anonymous")
+
+
 def record_case_denial(cid, method, status):
-    with conn() as c:
+    with closing(conn()) as c, c:
+        c.execute("BEGIN IMMEDIATE")
         if c.execute("select 1 from cases where id=? and owner_id=?", (cid, DEMO_SUBJECT)).fetchone():
             audit.record(c, "case.request." + method.lower(), case_id=cid, outcome=f"http-{status}")
+        else:
+            audit.record(c, "access.denied", outcome=f"http-{status}")
 
 
 def drain_file_cleanup(cid=None):
@@ -254,6 +275,7 @@ class CaseIn(BaseModel):
     diagnosis: str = Field(default="", max_length=4000)
     treatment: str = Field(default="", max_length=4000)
     estimatedCost: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    processingAuthorization: privacy.AuthorizationIn | None = None
 
 
 class ReviewIn(BaseModel):
@@ -293,9 +315,11 @@ def insert_case(data, status="Draft"):
     with conn() as c:
         c.execute(
             "insert into cases(id,data,status,created_at,updated_at,submission,owner_id) values(?,?,?,?,?,NULL,?)",
-            (cid, data.model_dump_json(), status, t, t, DEMO_SUBJECT),
+            (cid, data.model_dump_json(exclude={"processingAuthorization"}), status, t, t, DEMO_SUBJECT),
         )
         audit.record(c, "case.created", case_id=cid, object_id=cid)
+        if data.processingAuthorization:
+            privacy.save_authorization(c, cid, data.processingAuthorization)
     return cid
 
 
@@ -471,6 +495,8 @@ def seed_aarav(prepared=False):
         estimatedCost=85000,
     )
     cid = insert_case(data, "Needs Review")
+    with closing(conn()) as c, c:
+        privacy.seed_authorization(c, cid)
     sources = [
         (
             "Admission_Notes.pdf",
@@ -641,6 +667,7 @@ def startup():
     ensure_demo()
     drain_file_cleanup()
     with conn() as c:
+        privacy.backfill_demo(c)
         c.execute("update cases set status='Processing Failed' where status='Processing'")
 
 
@@ -649,14 +676,17 @@ def login(body: dict[str, str]):
     demo_login = "userId" in body or "password" in body
     configured_key = os.getenv("DEMO_ACCESS_KEY", "")
     if demo_login and os.getenv("DEMO_LOGIN_ENABLED") != "1":
+        record_anonymous_denial("auth.failed", "demo-disabled")
         raise HTTPException(403, "Demo credentials are disabled on this server")
     if not demo_login and (not configured_key or configured_key == "replace-with-a-long-random-local-key"):
+        record_anonymous_denial("auth.failed", "key-unconfigured")
         raise HTTPException(503, "Set a private DEMO_ACCESS_KEY in backend/.env before signing in")
     with _login_lock:
         cutoff = time.monotonic() - 60
         while _failed_logins and _failed_logins[0] <= cutoff:
             _failed_logins.popleft()
         if len(_failed_logins) >= 12:
+            record_anonymous_denial("auth.failed", "rate-limited")
             raise HTTPException(429, "Too many sign-in attempts. Try again in a minute.")
         if demo_login:
             valid_user = hmac.compare_digest(body.get("userId", "").encode(), b"user1")
@@ -666,6 +696,7 @@ def login(body: dict[str, str]):
             valid = hmac.compare_digest(body.get("accessKey", "").encode(), configured_key.encode())
         if not valid:
             _failed_logins.append(time.monotonic())
+            record_anonymous_denial("auth.failed", "invalid-credentials")
             raise HTTPException(401, "Demo credentials are incorrect" if demo_login else "Access key is incorrect")
     token = issue_token()
     marker = audit.session_id.set(token.split(":")[2])
@@ -744,7 +775,9 @@ def case_snapshot(case, connection):
 def update_case(cid: str, payload: CaseIn):
     with conn() as c:
         mutable_case(cid, c)
-        c.execute("update cases set data=? where id=?", (payload.model_dump_json(), cid))
+        c.execute("update cases set data=? where id=?", (payload.model_dump_json(exclude={"processingAuthorization"}), cid))
+        if payload.processingAuthorization:
+            privacy.save_authorization(c, cid, payload.processingAuthorization)
         invalidate_readiness(c, cid)
         audit.record(c, "case.updated", case_id=cid, object_id=cid)
     return case_json(getcase(cid))
@@ -838,6 +871,8 @@ def upload(
 def remove_doc(cid: str, did: str):
     with conn() as c:
         mutable_case(cid, c)
+        if restriction := privacy.deletion_restriction(privacy.case_record(c, cid)):
+            raise HTTPException(409, restriction)
         r = c.execute(
             "select stored from documents where id=? and case_id=?", (did, cid)
         ).fetchone()
@@ -846,6 +881,7 @@ def remove_doc(cid: str, did: str):
         c.execute("delete from documents where id=? and case_id=?", (did, cid))
         c.execute("delete from fields where source_doc=? and case_id=?", (did, cid))
         c.execute("delete from unsupported_proposals where source_doc=? and case_id=?", (did, cid))
+        c.execute("delete from document_privacy_reviews where document_id=? and case_id=?", (did, cid))
         c.execute("insert or ignore into file_cleanup values(?,?)", (cid, r["stored"]))
         audit.record(c, "document.removed", case_id=cid, object_id=did)
         invalidate_readiness(c, cid, "Documents Uploaded")
@@ -1003,7 +1039,8 @@ def ollama_timeout():
 def model_source(text):
     # The validator only admits field-specific labelled evidence. Send that
     # limited text to Ollama instead of sending instructions or other prose.
-    facts = list(source_facts(text[:7000]))
+    bounded = text if len(text) <= 7000 else text[:7000].rpartition("\n")[0]
+    facts = [fact for fact in source_facts(bounded) if not privacy.detect(fact[2])]
     names = sorted({name for name, _, _ in facts})
     return names, "\n".join(dict.fromkeys(quote for _, _, quote in facts))
 
@@ -1209,11 +1246,12 @@ def manual_field(cid: str, body: ManualFieldIn):
 
 @app.get("/api/cases/{cid}/evidence/{fid}")
 def evidence(cid: str, fid: str):
-    getcase(cid)
-    f = next((x for x in get_fields(cid) if x["id"] == fid), None)
-    if not f:
-        raise HTTPException(404, "Field not found")
-    with conn() as c:
+    with closing(conn()) as c, c:
+        c.execute("BEGIN IMMEDIATE")
+        getcase(cid, c)
+        f = next((x for x in get_fields(cid, c) if x["id"] == fid), None)
+        if not f:
+            raise HTTPException(404, "Field not found")
         d = (
             c.execute(
                 "select stored,text from documents where id=? and case_id=?",
@@ -1222,8 +1260,9 @@ def evidence(cid: str, fid: str):
             if f["source_doc"]
             else None
         )
-    if not d:
-        raise HTTPException(404, "No source document is linked to this field")
+        if not d:
+            raise HTTPException(404, "No source document is linked to this field")
+        audit.record(c, "document.evidence-viewed", case_id=cid, object_id=f["source_doc"])
     pages = document_pages(f["source_name"], d["text"])
     return {
         "field": f,
@@ -1237,15 +1276,13 @@ def evidence(cid: str, fid: str):
 
 @app.get("/api/cases/{cid}/documents/{did}/file")
 def doc_file(cid: str, did: str):
-    getcase(cid)
-    with conn() as c:
-        d = c.execute(
-            "select * from documents where id=? and case_id=?", (did, cid)
-        ).fetchone()
-    if not d:
-        raise HTTPException(404, "Document not found")
+    with closing(conn()) as c, c:
+        c.execute("BEGIN IMMEDIATE")
+        d = privacy.get_document(c, cid, did)
+        path = stored_path(d["stored"])
+        audit.record(c, "document.original-accessed", case_id=cid, object_id=did)
     return FileResponse(
-        stored_path(d["stored"]),
+        path,
         filename=d["filename"],
         media_type=mimetypes.guess_type(d["stored"])[0] or "application/octet-stream",
     )
@@ -1359,8 +1396,15 @@ def ready(cid: str, body: dict[str, str]):
 
 @app.post("/api/cases/{cid}/generate-packet")
 def packet(cid: str):
-    if getcase(cid)["status"] == "Processing":
+    with closing(conn()) as c, c:
+        c.execute("BEGIN IMMEDIATE")
+        return prepare_packet(cid, c)
+
+
+def prepare_packet(cid, connection):
+    if getcase(cid, connection)["status"] == "Processing":
         raise HTTPException(409, "Wait for document processing to finish")
+    audit.record(connection, "packet.prepared", case_id=cid, object_id=cid)
     return {
         "downloadUrl": f"/api/cases/{cid}/packet.pdf",
         "filename": PACKET_NAME,
@@ -1532,7 +1576,8 @@ def render_packet(cid, revision=None):
 @app.get("/api/cases/{cid}/packet.pdf")
 def get_packet(cid: str, revision: str | None = Query(default=None, max_length=64)):
     packet_bytes = render_packet(cid, revision)
-    with conn() as c:
+    with closing(conn()) as c, c:
+        c.execute("BEGIN IMMEDIATE")
         if c.execute("select 1 from cases where id=?", (cid,)).fetchone():
             audit.record(c, "packet.downloaded", case_id=cid, object_id=cid)
     return Response(
@@ -1548,6 +1593,10 @@ def packet_preview(cid: str, revision: str = Query(max_length=64), page: int = Q
         if page > len(document):
             raise HTTPException(404, "Draft page not found")
         image = document[page - 1].get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
+        with closing(conn()) as c, c:
+            c.execute("BEGIN IMMEDIATE")
+            getcase(cid, c)
+            audit.record(c, "packet.previewed", case_id=cid, object_id=cid)
         return {"page": page, "pages": len(document), "width": image.width, "height": image.height,
                 "png": b64encode(image.tobytes("png")).decode("ascii")}
 
@@ -1583,9 +1632,11 @@ def trust_config():
             configuration = "Ollama URL is invalid. Non-loopback requests are blocked."
         else:
             local_inference = True
-            configuration = "Eligible labelled source lines are sent to the configured loopback Ollama service. External endpoints and HTTP redirects are blocked."
+            configuration = "Eligible labelled source lines are sent to loopback Ollama. Lines with detected sensitive identifiers are excluded. External endpoints and HTTP redirects are blocked."
     elif provider != "mock":
         configuration = "Unknown provider. Processing is disabled."
+    with closing(conn()) as c:
+        security_events = c.execute("select count(*) from audit_events where action in ('access.denied','auth.failed')").fetchone()[0]
     return {
         "provider": provider,
         "model": os.getenv("OLLAMA_MODEL", "qwen3:4b") if provider == "ollama" else None,
@@ -1595,8 +1646,9 @@ def trust_config():
         "authorization": "Case ownership checked by the API",
         "humanReview": "Critical readiness blockers require review or an explicit, logged staff override.",
         "provenance": "Source document, page and quote for supported fields. Staff-entered values are labelled.",
-        "retention": "Local retention until manual case deletion. Automatic expiry is not configured.",
+        "retention": "Case-specific review dates and recorded legal holds restrict deletion. Review dates do not trigger automatic deletion.",
         "deletion": True,
+        "recordedSecurityEvents": security_events,
     }
 
 
@@ -1628,6 +1680,8 @@ def delete_case_data(cid: str):
         else:
             if case["status"] == "Processing":
                 raise HTTPException(409, "Wait for document processing to finish")
+            if restriction := privacy.deletion_restriction(privacy.case_record(c, cid)):
+                raise HTTPException(409, restriction)
             c.execute("insert or ignore into file_cleanup select case_id,stored from documents where case_id=?", (cid,))
             try:
                 legacy_packet = UPLOAD / f"{uuid.UUID(cid)}-packet.pdf"
@@ -1640,7 +1694,8 @@ def delete_case_data(cid: str):
                     artifacts = (path for path in directory.iterdir() if path.is_file() or path.is_symlink())
                     c.executemany("insert or ignore into file_cleanup values(?,?)",
                                   ((cid, str(path)) for path in artifacts))
-            for table in ("document_uploads", "unsupported_proposals", "fields", "documents", "audit_events"):
+            for table in ("document_uploads", "unsupported_proposals", "fields", "documents", "audit_events",
+                          "privacy_requests", "document_privacy_reviews", "case_privacy"):
                 c.execute(f"delete from {table} where case_id=?", (cid,))
             agent.delete_runs(c, cid)
             c.execute("delete from cases where id=?", (cid,))
@@ -1656,3 +1711,4 @@ def delete_case_data(cid: str):
 from . import agent
 
 app.include_router(agent.router)
+app.include_router(privacy.router)

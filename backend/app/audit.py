@@ -24,10 +24,14 @@ create table if not exists file_cleanup(
 """
 
 
-def record(connection, action, *, case_id=None, object_id=None, outcome="succeeded"):
+def actor_id():
+    return "demo-user" if session_id.get() else "system"
+
+
+def record(connection, action, *, case_id=None, object_id=None, outcome="succeeded", actor=None):
     session = session_id.get()
     connection.execute(
         "insert into audit_events values(?,?,?,?,?,?,?,?)",
-        (str(uuid4()), "demo-user" if session else "system", session, case_id,
+        (str(uuid4()), actor or actor_id(), session, case_id,
          action, object_id, datetime.now(timezone.utc).isoformat(), outcome),
     )

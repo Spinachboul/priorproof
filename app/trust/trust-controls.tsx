@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '../client-api';
+import { PrivacyPanel } from '../privacy-controls';
 
 type Config = {
     provider: string; model: string | null; localInference: boolean; transmission: string;
     authentication: string; authorization: string; humanReview: string; provenance: string;
-    retention: string; deletion: boolean;
+    retention: string; deletion: boolean; recordedSecurityEvents: number;
 };
 type Summary = { id: string; patientName: string; patientId: string };
 type Event = {
@@ -33,7 +34,7 @@ export default function TrustControls() {
         const configuredAPI = process.env.NEXT_PUBLIC_API_URL;
         setTransport(window.location.protocol === 'https:' && (!configuredAPI || configuredAPI.startsWith('https:'))
             ? 'HTTPS in use for the browser. Check the backend’s TLS certificate and hosting configuration.'
-            : 'Browser/API traffic can use unencrypted HTTP in the local demo.');
+            : 'Transport encryption is unavailable on any HTTP leg of this browser-to-API connection.');
         if (!sessionStorage.getItem('priorproof-token')) {
             setStatus('Sign in to verify the running controls and access case activity.');
             return;
@@ -91,9 +92,9 @@ export default function TrustControls() {
     const rows = config && [
         ['AI provider', config.provider === 'ollama' ? `Ollama · ${config.model}` : config.provider === 'mock' ? 'Deterministic demo rules' : config.provider],
         ['Inference', config.localInference ? 'Configured for loopback inference' : config.provider === 'mock' ? 'No model used' : 'Model processing unavailable'],
-        ['Document transmission', config.transmission], ['Browser transport', transport],
+        ['Document transmission', config.transmission],
         ['Authentication', config.authentication], ['Case authorization', config.authorization],
-        ['Human review', config.humanReview], ['Evidence provenance', config.provenance],
+        ['Recorded access denials and failed sign-ins', String(config.recordedSecurityEvents)], ['Human review', config.humanReview], ['Evidence provenance', config.provenance],
         ['Retention', config.retention], ['Case deletion', config.deletion ? 'Available to the case owner' : 'Unavailable'],
     ];
     return <div className="public-section trust-grid">
@@ -102,7 +103,7 @@ export default function TrustControls() {
                 <><p role="status">{status}</p><Link href="/workspace" className="public-button outline">Open workspace to sign in</Link></>}
         </section>
         {config && <section className="public-panel">
-            <h2>Case activity</h2><p>Events record the actor, session, object and outcome. Medical text is excluded.</p>
+            <h2>Audit and Accountability</h2><p>Events record the actor, session, object and outcome. Medical text is excluded.</p>
             <label htmlFor="trust-case">Select a case</label>
             <select id="trust-case" className="fieldinput" value={caseId} disabled={busy} onChange={event => { setMessage(''); setCaseId(event.target.value); }}>
                 <option value="">Choose a case</option>
@@ -114,6 +115,7 @@ export default function TrustControls() {
                     <td><code title={event.object_id || undefined}>{event.object_id?.slice(0, 8) || '—'}</code></td>
                     <td><time dateTime={event.timestamp}>{new Date(event.timestamp).toLocaleString()}</time></td><td>{event.outcome}</td></tr>)}</tbody></table></div>}
             {caseId && events.length === 0 && !activityError && <p>There are no recorded events for this case yet.</p>}
+            {caseId && <PrivacyPanel key={caseId} caseId={caseId} />}
             {caseId && <details className="trust-delete"><summary>Delete selected case</summary>
                 <p>This permanently removes the case’s database records and queues deletion of application-managed files. Downloaded copies and backups may still exist.</p>
                 <form onSubmit={event => { event.preventDefault(); if (confirmation === 'DELETE') deleteCase(caseId); }}>
@@ -124,8 +126,12 @@ export default function TrustControls() {
             {message && <p role="status">{message}</p>}
             {pendingCase && <button className="public-button outline" disabled={busy} onClick={() => deleteCase(pendingCase)}>Retry remaining file cleanup</button>}
         </section>}
+        <section className="public-panel"><h2>Document Confidentiality</h2><p>The case privacy panel screens extracted text with configurable, deterministic rules and masks the matched values. Authorized staff can inspect the preserved original separately. Masking coverage depends on readable text and recognizable patterns.</p></section>
+        <section className="public-panel"><h2>Local AI Processing</h2><p>{config ? config.transmission : 'Sign in to inspect the active provider and model settings.'}</p></section>
+        <section className="public-panel"><h2>Access Control</h2><p>{config ? config.authorization : 'Sign in to inspect the active access controls.'} The prototype uses a shared demo account and case-scoped API authorization.</p>{transport && <p>{transport}</p>}</section>
+        <section className="public-panel"><h2>Data Lifecycle</h2><p>{config ? config.retention : 'Select an authorized case to inspect its review date and any deletion restrictions.'}</p></section>
         <section className="public-panel">
-            <h2>Security limits</h2><p>One demo account shares access to its cases. Local storage is not encrypted by PriorProof. Deletion cannot recall exports or remove copies from backups, snapshots or disk recovery tooling.</p><p>The demo has no independent compliance assessment.</p>
+            <h2>Security Limitations</h2><p>One demo account shares access to its cases. Local storage is not encrypted by PriorProof. Deletion cannot recall exports or remove copies from backups, snapshots or disk recovery tooling.</p><p>Deployment requires individual staff accounts, role-based access, trusted HTTPS, encryption at rest, data processing agreements, independent security assessment, hospital-specific AI validation, and approved incident response, privacy and retention policies.</p>
         </section>
     </div>;
 }

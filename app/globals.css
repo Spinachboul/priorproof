@@ -1690,3 +1690,17 @@ tr.clickrow:hover {
     max-width: 100%;
     height: auto;
 }
+.privacy-panel { margin: 16px 0; }
+.privacy-panel > summary { cursor: pointer; font-weight: 700; }
+.privacy-content { display: grid; gap: 14px; margin-top: 14px; }
+.privacy-content section { border-top: 1px solid #dce4e9; padding-top: 12px; }
+.privacy-content h3 { margin: 0 0 8px; }
+.privacy-content form, .privacy-fields fieldset { display: grid; gap: 8px; justify-items: start; margin: 8px 0; }
+.privacy-fields fieldset { border: 1px solid #dce4e9; padding: 8px; width: 100%; }
+.privacy-fields legend { font-weight: 700; padding: 0 4px; }
+.privacy-fields label, .privacy-content label { overflow-wrap: anywhere; }
+.privacy-content dt { font-weight: 700; }
+.privacy-content dd { margin: 0 0 8px; }
+.masked-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; background: #f2f7f7; padding: 12px; }
+.privacy-request { border-top: 1px solid #dce4e9; }
+.regulatory-table th, .regulatory-table td { min-width: 145px; white-space: normal; vertical-align: top; }

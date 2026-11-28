@@ -1,0 +1,18 @@
+{
+  "default": {
+    "Aadhaar": "Potentially unnecessary",
+    "PAN": "Potentially unnecessary",
+    "Telephone": "Requires staff review",
+    "Email": "Requires staff review",
+    "Bank account": "Potentially unnecessary",
+    "Passport": "Requires staff review",
+    "Membership ID": "Requires staff review"
+  },
+  "purpose": {
+    "preauthorization": {"Membership ID": "Required for the stated workflow"}
+  },
+  "customIdentifiers": [
+    {"category": "Passport", "pattern": "(?im)\\bpassport(?:[ \\t]*(?:number|no\\.?))?[ \\t]*[:#=-][ \\t]*(?P<value>[A-Z][0-9]{7})\\b"},
+    {"category": "Membership ID", "pattern": "(?im)\\bmembership(?:[ \\t]*(?:number|ID|reference))?[ \\t]*[:#=-][ \\t]*(?P<value>[A-Z0-9][A-Z0-9-]{5,31})\\b"}
+  ]
+}

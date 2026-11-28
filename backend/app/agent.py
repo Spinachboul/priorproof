@@ -358,7 +358,7 @@ def generate_draft_packet(params, state):
                 case["updated_at"] != params.revision or state.get("approval_revision") != params.revision
                 or current["readiness"]["blockers"]):
             raise StopRun("Draft preparation requires current readiness and staff approval.")
-        packet = service.packet(params.case_id)["downloadUrl"]
+        packet = service.prepare_packet(params.case_id, connection)["downloadUrl"]
     return ToolOutput(summary="Prepared the staff-approved PDF draft for download.",
                       packet=f"{packet}?{urlencode({'revision': params.revision})}")
 

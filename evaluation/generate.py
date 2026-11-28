@@ -7,7 +7,10 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import pymupdf
 from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+import reportlab
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "public/evaluation"
@@ -32,22 +35,28 @@ NAMES = (
 )
 
 
-def pdf_record(title, lines, scanned=False, extra_page=False):
+def pdf_record(title, lines, scanned=False, extra_page=False, embedded_fonts=False):
     output = io.BytesIO()
     pdf = canvas.Canvas(output, pagesize=A4, invariant=True)
+    regular, bold = "Helvetica", "Helvetica-Bold"
+    if embedded_fonts:
+        font_dir = Path(reportlab.__file__).with_name("fonts")
+        regular, bold = "PrivacyDemoRegular", "PrivacyDemoBold"
+        pdfmetrics.registerFont(TTFont(regular, str(font_dir / "Vera.ttf")))
+        pdfmetrics.registerFont(TTFont(bold, str(font_dir / "VeraBd.ttf")))
     pdf.setTitle(f"Fictional evaluation record - {title}")
     pdf.setFillColor(HexColor("#103d39"))
-    pdf.setFont("Helvetica-Bold", 21)
+    pdf.setFont(bold, 21)
     pdf.drawString(54, 760, title)
-    pdf.setFont("Helvetica", 10)
+    pdf.setFont(regular, 10)
     pdf.drawString(54, 738, "PriorProof evaluation | Fictional record | No clinical or insurance use")
     pdf.line(54, 725, 540, 725)
     text = pdf.beginText(54, 692)
-    text.setFont("Helvetica", 14)
+    text.setFont(regular, 14)
     text.setLeading(26)
     text.textLines("\n".join(lines))
     pdf.drawText(text)
-    pdf.setFont("Helvetica", 9)
+    pdf.setFont(regular, 9)
     pdf.drawString(54, 45, "Fictional evaluation fixture")
     pdf.showPage()
     if extra_page:
@@ -120,6 +129,20 @@ def scenario(number, case_id, kind):
                 conflicts=conflict), contents
 
 
+def privacy_fixture():
+    return pdf_record("Fictional hospital intake record", [
+        "Patient reference: Aarav Sharma (fictional)",
+        "Aadhaar: 0000 0000 0000",
+        "PAN: ZZZZZ0000Z",
+        "Telephone: 0000000000",
+        "Email: aarav@example.invalid",
+        "Bank account: 000000000000",
+        "Membership ID: SYNTH-DEMO-8821",
+        "Reserved dummy values for screening practice.",
+        "Never use real identifiers.",
+    ], embedded_fonts=True)
+
+
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
     with ZipFile(OUTPUT / "synthetic-cases.zip", "w", ZIP_DEFLATED) as archive:
@@ -133,6 +156,7 @@ def main():
         ["Fictional Northstar Health membership card", "Member: Aarav Sharma",
          "Policy reference: NS-DEMO-8821", "Training use only"],
     ))
+    (OUTPUT / "aarav-privacy-record.pdf").write_bytes(privacy_fixture())
     print(f"Generated {len(SCENARIOS)} synthetic cases in {OUTPUT / 'synthetic-cases.zip'}")
 
 

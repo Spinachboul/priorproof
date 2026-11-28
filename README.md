@@ -202,6 +202,25 @@ To add a manual-versus-assisted comparison, place `workflow-timing.json` under `
 
 The Trust Centre reads the active backend configuration after authentication. Case activity stores pseudonymous actor/session IDs, object IDs, timestamps and outcomes. It excludes source text, extracted values and override reasons. Confirmed deletion removes the selected case data, upload artifacts and legacy packets managed by this application. Failed file cleanup is retried on startup or repeat deletion. The manual retention setting and limitations are described in the [draft policies](compliance/retention-policy.md).
 
+## Final privacy demonstration
+
+Start the fictional stack using the offline or Expo commands above. Restart the API after updating so it creates the privacy tables and backfills the seeded Aarav processing record.
+
+1. Open **Start Guided Demo** from the Patient journey. In **Case privacy and confidentiality**, read the processing purpose and notice version. For a new case, the case form records selected categories, recipients and basis. Confirming the form records a staff action. Separate evidence is required for actual consent or a legal basis.
+2. Open **Documents** and select **Upload fictional privacy record**. The same PDF is available at `/evaluation/aarav-privacy-record.pdf` for an upload from Expo. Use **Other supporting documents** so the membership-card requirement remains available for the existing cross-device demo.
+3. Expand **Case privacy and confidentiality** and select the supporting document. Show the masked text preview and classifications. Open the authorized original separately when needed. Record **Mark privacy reviewed** or **Flag privacy follow-up**. The preview masks detectable patterns in extracted text and does not redact the PDF.
+4. Continue **Agent Activity**, upload the existing fictional membership card from Expo, resolve the admission-date conflict and approve a draft. Open **Trust Centre** to see the case’s audit activity, privacy and retention controls, and the DPDP **Regulatory Readiness** table. Download the JSON privacy and processing summary from the case privacy panel.
+5. Optionally record an access request or grievance and update its handling status. Set a future retention review date or legal hold to demonstrate that the server blocks deletion. A recorded request does not automatically erase data.
+
+Detector classifications and additional contextual identifiers are configured in [privacy_rules.json](backend/app/privacy_rules.json). Screening does not independently validate Aadhaar, PAN, bank details or document authenticity. The summary omits raw identifiers, source text and case patient fields. Only authorized staff should access originals, clinical packets and source evidence. See the [privacy notice](compliance/privacy-notice.md), [inventory](compliance/data-inventory.md), [retention policy](compliance/retention-policy.md) and [official DPDP reference mapping](compliance/regulatory-readiness.md).
+
+### Verification on 28 November 2026
+
+- The backend suite passed all 39 tests, including masking, false positives, input minimization, original-file preservation, authorization, audit and deletion.
+- Web and mobile TypeScript checks and the Next.js production build passed.
+- A headless browser verified automatic guided sign-in, processing-purpose capture for new cases, the synthetic upload, a masked preview, staff privacy review, the summary download and Trust Centre. A second authenticated HTTP client uploaded the membership record and the browser resumed the agent.
+- This pass used deterministic extraction. Live Ollama inference and the workflow on physical Expo devices remain unverified for this phase. The preview masks text only. Production security and legal controls require separate organizational assessment.
+
 ## Run the checks
 
 ```bash
